@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Giỏ Hàng - TechShop{% endblock %}
+
+{% block content %}
+<h3 class="mb-4 fw-bold"><i class="bi bi-cart3 text-primary"></i> Giỏ Hàng Của Bạn</h3>
+
+{% if cart_items %}
+<div class="table-responsive bg-white p-3 rounded shadow-sm border">
+    <table class="table align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Sản phẩm</th>
+                <th>Đơn giá</th>
+                <th>Số lượng</th>
+                <th>Thành tiền</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in cart_items %}
+            <tr>
+                <td><strong>{{ item.product.name }}</strong></td>
+                <td>{{ "{:,.0f}".format(item.product.price) }} VNĐ</td>
+                <td>{{ item.quantity }}</td>
+                <td class="text-danger fw-bold">{{ "{:,.0f}".format(item.item_total) }} VNĐ</td>
+            </tr>
+            {% endfor %}
+            <tr>
+                <td colspan="3" class="text-end fw-bold fs-5">Tổng cộng:</td>
+                <td class="text-danger fw-bold fs-5">{{ "{:,.0f}".format(total_price) }} VNĐ</td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="d-flex justify-content-between mt-3">
+        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Tiếp tục mua sắm
+        </a>
+        <a href="{{ url_for('cart.checkout') }}" class="btn btn-success btn-lg">
+            Tiến hành Đặt hàng <i class="bi bi-credit-card"></i>
+        </a>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5 bg-white rounded shadow-sm border">
+    <i class="bi bi-cart-x display-1 text-muted"></i>
+    <h4 class="mt-3 text-muted">Giỏ hàng của bạn đang trống</h4>
+    <a href="{{ url_for('main.index') }}" class="btn btn-primary mt-3">Mua sắm ngay</a>
+</div>
+{% endif %}
+{% endblock %}
