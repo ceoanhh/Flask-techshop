@@ -5,7 +5,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -71,6 +71,24 @@ class Order(db.Model):
 
     items = db.relationship('OrderItem', backref='order', lazy='dynamic', cascade='all, delete-orphan')
 
+    @property
+    def status_label(self):
+        labels = {
+            'pending': 'Chờ xử lý',
+            'completed': 'Hoàn thành',
+            'cancelled': 'Đã hủy'
+        }
+        return labels.get(self.status, self.status)
+
+    @property
+    def status_badge_class(self):
+        classes = {
+            'pending': 'warning',
+            'completed': 'success',
+            'cancelled': 'danger'
+        }
+        return classes.get(self.status, 'secondary')
+
     def __repr__(self):
         return f'<Order #{self.id} - {self.status}>'
 
@@ -81,6 +99,10 @@ class OrderItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     unit_price = db.Column(db.Float, nullable=False, default=0.0)
+
+    @property
+    def subtotal(self):
+        return self.unit_price * self.quantity
 
     def __repr__(self):
         return f'<OrderItem Prod:{self.product_id} x {self.quantity}>'
