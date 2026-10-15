@@ -1,38 +1,33 @@
-{% extends 'base.html' %}
-
-{% block title %}Đăng Ký - TechShop{% endblock %}
+{% extends "base.html" %}
+{% block title %}Đăng Ký Tài Khoản{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-5">
-        <div class="card shadow-sm border-0 mt-3">
+        <div class="card shadow border-0 rounded-3">
             <div class="card-body p-4">
-                <h3 class="card-title text-center fw-bold mb-4 text-primary">
-                    <i class="bi bi-person-plus"></i> Tạo Tài Khoản
-                </h3>
+                <h3 class="card-title text-center mb-4 text-primary fw-bold">Tạo Tài Khoản</h3>
                 <form action="{{ url_for('auth.register') }}" method="POST">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Tên người dùng</label>
-                        <input type="text" name="username" class="form-control" required placeholder="Ví dụ: nguyenvana">
+                        <label class="form-label fw-semibold">Tên người dùng (Username)</label>
+                        <input type="text" name="username" class="form-control" placeholder="Nhập username" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Email</label>
-                        <input type="email" name="email" class="form-control" required placeholder="email@domain.com">
+                        <label class="form-label fw-semibold">Email</label>
+                        <input type="email" name="email" class="form-control" placeholder="name@example.com" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Mật khẩu</label>
-                        <input type="password" name="password" class="form-control" required placeholder="Tối thiểu 6 ký tự">
+                        <label class="form-label fw-semibold">Mật khẩu</label>
+                        <input type="password" name="password" class="form-control" placeholder="Tối thiểu 6 ký tự" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Nhập lại mật khẩu</label>
-                        <input type="password" name="confirm_password" class="form-control" required placeholder="Nhập lại mật khẩu">
+                        <label class="form-label fw-semibold">Xác nhận mật khẩu</label>
+                        <input type="password" name="confirm_password" class="form-control" placeholder="Nhập lại mật khẩu" required>
                     </div>
-                    <div class="d-grid mt-4">
-                        <button type="submit" class="btn btn-primary btn-lg">Đăng Ký</button>
-                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-2">Đăng Ký</button>
                 </form>
-                <div class="text-center mt-3 text-muted">
-                    Đã có tài khoản? <a href="{{ url_for('auth.login') }}">Đăng nhập</a>
+                <div class="text-center mt-3">
+                    <small>Đã có tài khoản? <a href="{{ url_for('auth.login') }}" class="text-decoration-none">Đăng nhập ngay</a></small>
                 </div>
             </div>
         </div>
