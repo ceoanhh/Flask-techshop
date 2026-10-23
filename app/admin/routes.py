@@ -37,23 +37,10 @@ def require_admin_access():
 def dashboard():
     total_orders = Order.query.count()
     total_products = Product.query.count()
-    pending_orders = Order.query.filter_by(status='pending').count()
-    completed_orders = Order.query.filter_by(status='completed').count()
-
-    # Tính tổng doanh thu từ các đơn hàng thành công
-    completed_orders_list = Order.query.filter_by(status='completed').all()
-    total_revenue = sum(o.total_amount for o in completed_orders_list)
-
-    recent_orders = Order.query.order_by(Order.created_at.desc()).limit(5).all()
-
     return render_template(
         'admin/dashboard.html',
         total_orders=total_orders,
-        total_products=total_products,
-        pending_orders=pending_orders,
-        completed_orders=completed_orders,
-        total_revenue=total_revenue,
-        recent_orders=recent_orders
+        total_products=total_products
     )
 
 
