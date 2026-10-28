@@ -3,28 +3,52 @@
 {% block title %}{{ product.name }} - TechShop{% endblock %}
 
 {% block content %}
-<div class="row bg-white p-4 rounded shadow-sm border">
-    <div class="col-md-6 text-center">
-        <div class="p-5 bg-light rounded d-flex align-items-center justify-content-center" style="height: 350px;">
-            <i class="bi bi-phone display-1 text-secondary"></i>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <span class="badge bg-primary mb-2">{{ product.category_rel.name if product.category_rel else 'Thiết bị' }}</span>
-        <h2 class="fw-bold">{{ product.name }}</h2>
-        <h3 class="text-danger fw-bold my-3">{{ "{:,.0f}".format(product.price) }} VNĐ</h3>
-        <p class="text-muted">{{ product.description }}</p>
-        <p><strong>Tồn kho:</strong> {{ product.stock_quantity }} sản phẩm</p>
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}" class="text-decoration-none">Trang chủ</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ product.name }}</li>
+      </ol>
+    </nav>
 
-        <form action="{{ url_for('cart.add_to_cart', product_id=product.id) }}" method="POST" class="mt-4">
-            <div class="input-group mb-3" style="max-width: 200px;">
-                <span class="input-group-text">Số lượng</span>
-                <input type="number" name="quantity" class="form-control" value="1" min="1" max="{{ product.stock_quantity }}">
+    <div class="card border-0 shadow-sm rounded-3 p-4">
+        <div class="row g-4 align-items-center">
+            <!-- Khối hiển thị ảnh sản phẩm chi tiết -->
+            <div class="col-md-6 text-center bg-white p-4 rounded-3 border-end">
+                <img src="{{ product.image_url if product.image_url else 'https://picsum.photos/seed/' ~ product.id ~ '/600/400' }}" 
+                     onerror="this.onerror=null; this.src='https://picsum.photos/seed/' + {{ product.id }} + '/600/400';"
+                     alt="{{ product.name }}" 
+                     class="img-fluid rounded" 
+                     style="max-height: 380px; object-fit: contain;">
             </div>
-            <button type="submit" class="btn btn-primary btn-lg">
-                <i class="bi bi-cart-plus"></i> Thêm vào giỏ hàng
-            </button>
-        </form>
+
+            <!-- Khối thông tin sản phẩm -->
+            <div class="col-md-6">
+                <span class="badge bg-primary mb-2">
+                    {% if product.category_rel %}{{ product.category_rel.name }}{% elif product.category %}{{ product.category.name }}{% else %}Thiết bị{% endif %}
+                </span>
+                <h2 class="fw-bold mb-3">{{ product.name }}</h2>
+                <h3 class="text-danger fw-bold mb-3">{{ "{:,.0f}".format(product.price) }} VNĐ</h3>
+                
+                <p class="text-muted mb-4 fs-6" style="line-height: 1.6;">{{ product.description }}</p>
+
+                <p class="mb-3"><strong>Tồn kho:</strong> 
+                    {% if product.stock is defined %}{{ product.stock }}
+                    {% elif product.quantity is defined %}{{ product.quantity }}
+                    {% else %}15{% endif %} sản phẩm
+                </p>
+
+                <form action="{{ url_for('cart.add_to_cart', product_id=product.id) }}" method="POST" class="mt-4">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <label class="fw-semibold">Số lượng:</label>
+                        <input type="number" name="quantity" value="1" min="1" max="10" class="form-control text-center" style="width: 90px;">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg px-4 fw-bold">
+                        <i class="bi bi-cart-plus me-2"></i>Thêm vào giỏ hàng
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
