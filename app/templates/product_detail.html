@@ -15,10 +15,10 @@
         <div class="row g-4 align-items-center">
             <!-- Khối hiển thị ảnh sản phẩm chi tiết -->
             <div class="col-md-6 text-center bg-white p-4 rounded-3 border-end">
-                <img src="{{ product.image_url if product.image_url else 'https://picsum.photos/seed/' ~ product.id ~ '/600/400' }}" 
-                     onerror="this.onerror=null; this.src='https://picsum.photos/seed/' + {{ product.id }} + '/600/400';"
-                     alt="{{ product.name }}" 
-                     class="img-fluid rounded" 
+                <img src="{{ product.image_url if product.image_url else 'https://picsum.photos/seed/' ~ product.id ~ '/600/400' }}"
+                     onerror="this.onerror=null; this.src='https://picsum.photos/seed/{{ product.id }}/600/400';"
+                     alt="{{ product.name }}"
+                     class="img-fluid rounded"
                      style="max-height: 380px; object-fit: contain;">
             </div>
 
@@ -29,10 +29,10 @@
                 </span>
                 <h2 class="fw-bold mb-3">{{ product.name }}</h2>
                 <h3 class="text-danger fw-bold mb-3">{{ "{:,.0f}".format(product.price) }} VNĐ</h3>
-                
+
                 <p class="text-muted mb-4 fs-6" style="line-height: 1.6;">{{ product.description }}</p>
 
-                <p class="mb-3"><strong>Tồn kho:</strong> 
+                <p class="mb-3"><strong>Tồn kho:</strong>
                     {% if product.stock is defined %}{{ product.stock }}
                     {% elif product.quantity is defined %}{{ product.quantity }}
                     {% else %}15{% endif %} sản phẩm
