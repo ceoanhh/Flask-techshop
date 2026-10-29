@@ -3,46 +3,107 @@
 {% block title %}Quản Lý Đơn Hàng - TechShop Admin{% endblock %}
 
 {% block admin_content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2 fw-bold text-dark">Quản Lý Đơn Hàng</h1>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-3 mb-3 border-bottom">
+    <div>
+        <h1 class="h3 fw-bold text-dark mb-0">Quản Lý Đơn Hàng</h1>
+        <small class="text-muted">Theo dõi, xử lý và cập nhật trạng thái đơn hàng của khách</small>
+    </div>
 </div>
 
-<div class="table-responsive bg-white p-3 rounded shadow-sm border">
-    <table class="table table-hover align-middle">
-        <thead class="table-light">
-            <tr>
-                <th>Mã ĐH</th>
-                <th>Khách hàng</th>
-                <th>SĐT</th>
-                <th>Tổng tiền</th>
-                <th>Trạng thái</th>
-                <th>Ngày đặt</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for o in orders %}
-            <tr>
-                <td>#{{ o.id }}</td>
-                <td><strong>{{ o.recipient_name }}</strong></td>
-                <td>{{ o.phone }}</td>
-                <td class="text-danger fw-bold">{{ "{:,.0f}".format(o.total_amount) }} VNĐ</td>
-                <td>
-                    {% if o.status == 'completed' %}
-                        <span class="badge bg-success">Hoàn thành</span>
-                    {% elif o.status == 'cancelled' %}
-                        <span class="badge bg-danger">Đã hủy</span>
-                    {% else %}
-                        <span class="badge bg-warning text-dark">Chờ xử lý</span>
-                    {% endif %}
-                </td>
-                <td>{{ o.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="6" class="text-center text-muted py-3">Chưa có đơn hàng nào phát sinh.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<!-- Bộ lọc theo trạng thái (Pills) & Tìm kiếm -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ url_for('admin.manage_orders', status='all', q=search_query) }}" 
+               class="btn btn-sm {{ 'btn-dark' if status_filter == 'all' else 'btn-outline-dark' }}">
+                Tất cả <span class="badge bg-secondary ms-1">{{ counts.all }}</span>
+            </a>
+            <a href="{{ url_for('admin.manage_orders', status='pending', q=search_query) }}" 
+               class="btn btn-sm {{ 'btn-warning text-dark' if status_filter == 'pending' else 'btn-outline-warning text-dark' }}">
+                <i class="bi bi-hourglass-split"></i> Chờ xử lý <span class="badge bg-dark ms-1">{{ counts.pending }}</span>
+            </a>
+            <a href="{{ url_for('admin.manage_orders', status='completed', q=search_query) }}" 
+               class="btn btn-sm {{ 'btn-success' if status_filter == 'completed' else 'btn-outline-success' }}">
+                <i class="bi bi-check-circle"></i> Hoàn thành <span class="badge bg-white text-success ms-1">{{ counts.completed }}</span>
+            </a>
+            <a href="{{ url_for('admin.manage_orders', status='cancelled', q=search_query) }}" 
+               class="btn btn-sm {{ 'btn-danger' if status_filter == 'cancelled' else 'btn-outline-danger' }}">
+                <i class="bi bi-x-circle"></i> Đã hủy <span class="badge bg-white text-danger ms-1">{{ counts.cancelled }}</span>
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <form method="GET" action="{{ url_for('admin.manage_orders') }}" class="input-group input-group-sm">
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Tìm theo mã đơn, tên, SĐT...">
+            <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+            {% if search_query %}
+            <a href="{{ url_for('admin.manage_orders', status=status_filter) }}" class="btn btn-outline-danger" title="Xóa tìm kiếm"><i class="bi bi-x-lg"></i></a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Bảng đơn hàng -->
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 80px;">Mã ĐH</th>
+                    <th>Khách hàng</th>
+                    <th>Số điện thoại</th>
+                    <th>Tổng tiền</th>
+                    <th style="min-width: 170px;">Cập nhật Trạng thái</th>
+                    <th>Ngày đặt</th>
+                    <th class="text-end pe-3" style="width: 110px;">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr>
+                    <td class="fw-bold text-primary">#{{ o.id }}</td>
+                    <td>
+                        <strong class="text-dark">{{ o.recipient_name }}</strong>
+                        <div class="small text-muted text-truncate" style="max-width: 200px;" title="{{ o.address }}">
+                            <i class="bi bi-geo-alt"></i> {{ o.address }}
+                        </div>
+                    </td>
+                    <td>{{ o.phone }}</td>
+                    <td>
+                        <span class="text-danger fw-bold">{{ "{:,.0f}".format(o.total_amount) }} VNĐ</span>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('admin.update_order_status', order_id=o.id) }}" method="POST" class="d-flex align-items-center gap-1">
+                            <select name="status" class="form-select form-select-sm" style="width: 125px;">
+                                <option value="pending" {% if o.status == 'pending' %}selected{% endif %}>Chờ xử lý</option>
+                                <option value="completed" {% if o.status == 'completed' %}selected{% endif %}>Hoàn thành</option>
+                                <option value="cancelled" {% if o.status == 'cancelled' %}selected{% endif %}>Đã hủy</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-primary" title="Lưu trạng thái">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                        </form>
+                    </td>
+                    <td class="text-muted small">
+                        {{ o.created_at.strftime('%d/%m/%Y %H:%M') }}
+                    </td>
+                    <td class="text-end pe-3">
+                        <a href="{{ url_for('admin.order_detail', order_id=o.id) }}" class="btn btn-sm btn-outline-info" title="Xem chi tiết đơn">
+                            <i class="bi bi-eye"></i> Chi tiết
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <i class="bi bi-receipt-cutoff display-4 d-block mb-2 text-secondary"></i>
+                        Không có đơn hàng nào phù hợp với điều kiện tìm kiếm.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

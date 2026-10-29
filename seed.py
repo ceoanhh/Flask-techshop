@@ -1,284 +1,237 @@
+from datetime import datetime, timedelta
 from app import create_app
 from app.extensions import db
 from app.models import User, Category, Product, Order, OrderItem
-from werkzeug.security import generate_password_hash
-from datetime import datetime, timedelta
-import random
 
 app = create_app()
 
 def seed_data():
     with app.app_context():
-        print("Đang xóa dữ liệu cũ và khởi tạo bảng CSDL mới...")
-        db.drop_all()
         db.create_all()
 
-        print("1. Tạo tài khoản người dùng mẫu...")
-        admin = User(
-            username='admin',
-            email='admin@techshop.vn',
-            password_hash=generate_password_hash('admin123', method='scrypt'),
-            role='admin'
-        )
-        user1 = User(
-            username='khachhang',
-            email='user@techshop.vn',
-            password_hash=generate_password_hash('user123', method='scrypt'),
-            role='customer'
-        )
-        user2 = User(
-            username='danpham',
-            email='dan@gmail.com',
-            password_hash=generate_password_hash('123456', method='scrypt'),
-            role='customer'
-        )
-        db.session.add_all([admin, user1, user2])
+        print("=> Đang tạo tài khoản người dùng...")
+        # 1. Tạo tài khoản Admin & Khách hàng mẫu
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            admin = User(username='admin', email='admin@techshop.vn', role='admin')
+            admin.set_password('admin123')
+            db.session.add(admin)
+
+        user1 = User.query.filter_by(username='khachhang').first()
+        if not user1:
+            user1 = User(username='khachhang', email='user@techshop.vn', role='customer')
+            user1.set_password('user123')
+            db.session.add(user1)
+
+        user2 = User.query.filter_by(username='hoangnam').first()
+        if not user2:
+            user2 = User(username='hoangnam', email='nam.hoang@gmail.com', role='customer')
+            user2.set_password('user123')
+            db.session.add(user2)
+
         db.session.commit()
 
-        print("2. Tạo danh mục sản phẩm...")
+        # 2. Tạo Danh mục sản phẩm
+        print("=> Đang tạo danh mục sản phẩm...")
         cats_data = [
             {'name': 'Điện thoại', 'slug': 'dien-thoai'},
             {'name': 'Laptop', 'slug': 'laptop'},
             {'name': 'Tai nghe', 'slug': 'tai-nghe'},
-            {'name': 'Chuột & Bàn phím', 'slug': 'chuot-ban-phim'},
-            {'name': 'Phụ kiện', 'slug': 'phu-kien'}
+            {'name': 'Phụ kiện', 'slug': 'phu-kien'},
+            {'name': 'Đồng hồ thông minh', 'slug': 'dong-ho-thong-minh'}
         ]
-        cats_dict = {}
+        created_cats = {}
         for c in cats_data:
-            cat = Category(name=c['name'], slug=c['slug'])
-            db.session.add(cat)
-            cats_dict[c['slug']] = cat
+            cat_obj = Category.query.filter_by(slug=c['slug']).first()
+            if not cat_obj:
+                cat_obj = Category(name=c['name'], slug=c['slug'])
+                db.session.add(cat_obj)
+                db.session.flush()
+            created_cats[c['slug']] = cat_obj
+
         db.session.commit()
 
-        print("3. Tạo 16 Loại mặt hàng khác nhau kèm đường dẫn ảnh trùng khớp 100%...")
-        products_data = [
-            # 1. Laptop MacBook
+        # 3. Tạo Sản phẩm mẫu
+        print("=> Đang kiểm tra và tạo sản phẩm mẫu...")
+        sample_products = [
             {
-                'name': 'MacBook Air M2 13.6 inch 256GB',
-                'description': 'Thiết kế mỏng nhẹ đẳng cấp, chip Apple M2 hiệu năng vượt trội, thời lượng pin cả ngày dài.',
-                'price': 24490000,
-                'stock': 15,
-                'image_url': 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500&auto=format&fit=crop',
-                'category': cats_dict['laptop']
-            },
-            # 2. Laptop Dell
-            {
-                'name': 'Dell XPS 13 9315 Core i7',
-                'description': 'Màn hình FHD+ sắc nét, thiết kế nhôm nguyên khối sang trọng, tối ưu cho lập trình viên.',
-                'price': 28990000,
-                'stock': 10,
-                'image_url': 'https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=500&auto=format&fit=crop',
-                'category': cats_dict['laptop']
-            },
-            # 3. Laptop Gaming
-            {
-                'name': 'Laptop Gaming ASUS ROG Strix G16',
-                'description': 'Intel Core i7 Gen 13, RTX 4060, màn hình 165Hz siêu mượt chuyên game đồ họa nặng.',
-                'price': 34990000,
-                'stock': 8,
-                'image_url': 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=500&auto=format&fit=crop',
-                'category': cats_dict['laptop']
-            },
-            # 4. Laptop ThinkPad
-            {
-                'name': 'Lenovo ThinkPad X1 Carbon Gen 11',
-                'description': 'Bàn phím trứ danh, độ bền chuẩn quân đội, trọng lượng siêu nhẹ chỉ 1.12kg.',
-                'price': 36500000,
-                'stock': 6,
-                'image_url': 'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=500&auto=format&fit=crop',
-                'category': cats_dict['laptop']
-            },
-
-            # 5. iPhone
-            {
-                'name': 'iPhone 15 Pro Max 256GB Titanium',
-                'description': 'Khung vỏ Titan siêu bền nhẹ, chip Apple A17 Pro mạnh nhất, camera zoom quang học 5x.',
+                'name': 'iPhone 15 Pro Max 256GB',
                 'price': 29990000,
-                'stock': 20,
-                'image_url': 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop',
-                'category': cats_dict['dien-thoai']
+                'stock_quantity': 25,
+                'description': 'Khung viền titan cao cấp, chip Apple A17 Pro cực mạnh mẽ, camera tiềm vọng zoom 5x.',
+                'image_url': 'default_product.png',
+                'category_id': created_cats['dien-thoai'].id
             },
-            # 6. Samsung Galaxy
             {
                 'name': 'Samsung Galaxy S24 Ultra 512GB',
-                'description': 'Tích hợp Galaxy AI thông minh, viết S-Pen tiện lợi, camera 200MP bắt trọn mọi khoảnh khắc.',
-                'price': 31490000,
-                'stock': 12,
-                'image_url': 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=500&auto=format&fit=crop',
-                'category': cats_dict['dien-thoai']
+                'price': 28490000,
+                'stock_quantity': 18,
+                'description': 'Màn hình phẳng chống chói 6.8 inch, camera 200MP, tích hợp bút S-Pen và Galaxy AI đỉnh cao.',
+                'image_url': 'default_product.png',
+                'category_id': created_cats['dien-thoai'].id
             },
-            # 7. Xiaomi
             {
-                'name': 'Xiaomi 14 Ultra 512GB Leica',
-                'description': 'Ống kính quang học Leica đỉnh cao, sạc siêu nhanh 90W, màn hình AMOLED 120Hz rực rỡ.',
-                'price': 26990000,
-                'stock': 7,
-                'image_url': 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&auto=format&fit=crop',
-                'category': cats_dict['dien-thoai']
+                'name': 'MacBook Air M2 13.6 inch 256GB',
+                'price': 24490000,
+                'stock_quantity': 15,
+                'description': 'Thiết kế siêu mỏng nhẹ thời thượng, thời lượng pin cả ngày, chip Apple M2 mượt mà ấn tượng.',
+                'image_url': 'default_product.png',
+                'category_id': created_cats['laptop'].id
             },
-            # 8. Google Pixel
             {
-                'name': 'Google Pixel 8 Pro 128GB',
-                'description': 'Hệ điều hành Android thuần mượt mà, xử lý hình ảnh AI đỉnh cao, màn hình Super Actua sắc nét.',
-                'price': 21500000,
-                'stock': 9,
-                'image_url': 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&auto=format&fit=crop',
-                'category': cats_dict['dien-thoai']
+                'name': 'Laptop Asus ROG Zephyrus G14',
+                'price': 38990000,
+                'stock_quantity': 10,
+                'description': 'Laptop gaming nhỏ gọn mạnh mẽ hàng đầu với AMD Ryzen 9 và GPU NVIDIA RTX 4060.',
+                'image_url': 'default_product.png',
+                'category_id': created_cats['laptop'].id
             },
-
-            # 9. Tai nghe chụp tai Sony
             {
-                'name': 'Tai nghe chống ồn Sony WH-1000XM5',
-                'description': 'Công nghệ chống ồn ANC tốt nhất thế giới, âm thanh Hi-Res chân thực, pin sử dụng 30 giờ.',
+                'name': 'Tai nghe Sony WH-1000XM5',
                 'price': 7990000,
-                'stock': 25,
-                'image_url': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop',
-                'category': cats_dict['tai-nghe']
+                'stock_quantity': 35,
+                'description': 'Công nghệ chống ồn chủ động hàng đầu ngành, thời lượng pin 30 giờ và âm thanh chuẩn Hi-Res.',
+                'image_url': 'default_product.png',
+                'category_id': created_cats['tai-nghe'].id
             },
-            # 10. Tai nghe AirPods
             {
-                'name': 'Tai nghe Apple AirPods Pro 2 MagSafe',
-                'description': 'Chíp H2 cải tiến, chống ồn gấp 2 lần, âm thanh không gian cảm nhận theo cử động đầu.',
-                'price': 5990000,
-                'stock': 30,
-                'image_url': 'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500&auto=format&fit=crop',
-                'category': cats_dict['tai-nghe']
+                'name': 'AirPods Pro 2 USB-C',
+                'price': 5790000,
+                'stock_quantity': 40,
+                'description': 'Chống ồn chủ động gấp đôi, chế độ Xuyên âm thích ứng và hộp sạc MagSafe chuẩn Type-C tiện lợi.',
+                'image_url': 'default_product.png',
+                'category_id': created_cats['tai-nghe'].id
             },
-            # 11. Tai nghe Marshall
-            {
-                'name': 'Tai nghe Marshall Major IV Wireless',
-                'description': 'Thiết kế cổ điển đặc trưng Marshall, âm thanh chất lượng cao, thời lượng pin vượt trội 80 giờ.',
-                'price': 3990000,
-                'stock': 14,
-                'image_url': 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=500&auto=format&fit=crop',
-                'category': cats_dict['tai-nghe']
-            },
-
-            # 12. Chuột Logitech
             {
                 'name': 'Chuột không dây Logitech MX Master 3S',
-                'description': 'Cảm biến 8K DPI lướt trên mọi bề mặt, nút cuộn cuộn MagSpeed siêu nhanh và êm ái.',
                 'price': 2190000,
-                'stock': 40,
-                'image_url': 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=500&auto=format&fit=crop',
-                'category': cats_dict['chuot-ban-phim']
+                'stock_quantity': 50,
+                'description': 'Chuột công thái học cao cấp dành cho lập trình viên và sáng tạo nội dung, cuộn siêu tốc MagSpeed.',
+                'image_url': 'default_product.png',
+                'category_id': created_cats['phu-kien'].id
             },
-            # 13. Bàn phím Keychron
             {
-                'name': 'Bàn phím cơ Keychron K2 V2 Wireless',
-                'description': 'Bàn phím cơ Bluetooth kết nối 3 thiết bị, Switch Gateron gõ cực êm, đèn LED RGB rực rỡ.',
-                'price': 1950000,
-                'stock': 18,
-                'image_url': 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=500&auto=format&fit=crop',
-                'category': cats_dict['chuot-ban-phim']
+                'name': 'Bàn phím cơ Keychron K3 Pro RGB',
+                'price': 2490000,
+                'stock_quantity': 30,
+                'description': 'Bàn phím cơ layout 75% siêu mỏng, hỗ trợ kết nối Bluetooth 5.1 và cáp rời Type-C, hot-swap tiện lợi.',
+                'image_url': 'default_product.png',
+                'category_id': created_cats['phu-kien'].id
             },
-            # 14. Bàn phím Akko
             {
-                'name': 'Bàn phím cơ Akko 3087 V2 Silent',
-                'description': 'Layout TKL gọn gàng, Keycap PBT Double-Shot bền bỉ, Switch Pink cho cảm giác gõ êm nhẹ.',
-                'price': 1450000,
-                'stock': 22,
-                'image_url': 'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=500&auto=format&fit=crop',
-                'category': cats_dict['chuot-ban-phim']
-            },
-
-            # 15. Đồng hồ Apple Watch
-            {
-                'name': 'Đồng hồ Apple Watch Series 9 GPS 45mm',
-                'description': 'Theo dõi sức khỏe toàn diện, màn hình Retina Always-On sáng gấp đôi, thao tác chạm hai lần tiện lợi.',
-                'price': 10490000,
-                'stock': 16,
-                'image_url': 'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?w=500&auto=format&fit=crop',
-                'category': cats_dict['phu-kien']
-            },
-            # 16. Sạc dự phòng Anker
-            {
-                'name': 'Sạc dự phòng Anker Prime 20,000mAh 200W',
-                'description': 'Công suất cực lớn sạc nhanh cùng lúc 2 laptop, màn hình kỹ thuật số hiển thị thông số sạc.',
-                'price': 2850000,
-                'stock': 50,
-                'image_url': 'https://images.unsplash.com/photo-1609592424009-54743c3d5269?w=500&auto=format&fit=crop',
-                'category': cats_dict['phu-kien']
+                'name': 'Apple Watch Series 9 GPS 45mm',
+                'price': 9890000,
+                'stock_quantity': 20,
+                'description': 'Màn hình luôn bật Retina siêu sáng, thao tác chạm hai lần Double Tap độc đáo và theo dõi sức khỏe chuyên sâu.',
+                'image_url': 'default_product.png',
+                'category_id': created_cats['dong-ho-thong-minh'].id
             }
         ]
 
-        created_products = []
-        for p in products_data:
-            kwargs = {
-                'name': p['name'],
-                'description': p['description'],
-                'price': p['price'],
-                'image_url': p['image_url'],
-                'category_id': p['category'].id
-            }
-            if hasattr(Product, 'stock'):
-                kwargs['stock'] = p['stock']
-            elif hasattr(Product, 'quantity'):
-                kwargs['quantity'] = p['stock']
+        for p_data in sample_products:
+            existing_prod = Product.query.filter_by(name=p_data['name']).first()
+            if not existing_prod:
+                prod_obj = Product(**p_data)
+                db.session.add(prod_obj)
 
-            prod = Product(**kwargs)
-            db.session.add(prod)
-            created_products.append(prod)
         db.session.commit()
 
-        print("4. Tạo đơn hàng mẫu...")
-        statuses = ['completed', 'pending', 'completed', 'cancelled', 'completed']
-        sample_names = ['Phạm Văn Dần', 'Nguyễn Thị Ánh', 'Trần Văn Bảo', 'Lê Hoàng Nam', 'Đỗ Thị Linh']
-        sample_phones = ['0987654321', '0912345678', '0905123456', '0934567890', '0978123456']
-        sample_addresses = [
-            '122 Hoàng Quốc Việt, Cầu Giấy, Hà Nội',
-            '45 Nguyễn Trãi, Thanh Xuân, Hà Nội',
-            '88 Cầu Giấy, Hà Nội',
-            '15 Mộc Bài, Q.10, TP.HCM',
-            '102 Điện Biên Phủ, Đà Nẵng'
-        ]
+        # 4. Tạo Đơn hàng mẫu (Giúp cả nhóm và Bảo test Dashboard, Thống kê, Quản lý đơn)
+        if Order.query.count() == 0:
+            print("=> Đang tạo đơn hàng và chi tiết đơn hàng mẫu...")
+            prods = Product.query.all()
+            prod_dict = {p.name: p for p in prods}
 
-        for i in range(1, 6):
-            sample_prods = random.sample(created_products, k=2)
-            total_val = sum(p.price for p in sample_prods)
-            
-            # Khởi tạo Order đầy đủ các thông tin giao hàng bắt buộc
-            order_kwargs = {
-                'user_id': user2.id if i % 2 == 0 else user1.id,
-                'recipient_name': sample_names[i-1],
-                'phone': sample_phones[i-1],
-                'address': sample_addresses[i-1],
-                'status': statuses[i-1],
-                'created_at': datetime.now() - timedelta(days=i*2)
-            }
+            now = datetime.utcnow()
 
-            # Tự động gán trường tổng tiền thích ứng với Model
-            if hasattr(Order, 'total_amount'):
-                order_kwargs['total_amount'] = total_val
-            elif hasattr(Order, 'total_price'):
-                order_kwargs['total_price'] = total_val
-            elif hasattr(Order, 'total'):
-                order_kwargs['total'] = total_val
-
-            order = Order(**order_kwargs)
-            db.session.add(order)
-            db.session.commit()
-
-            for p in sample_prods:
-                item_kwargs = {
-                    'order_id': order.id,
-                    'product_id': p.id,
-                    'quantity': 1
+            sample_orders = [
+                {
+                    'user_id': user1.id,
+                    'recipient_name': 'Nguyễn Văn Khách',
+                    'phone': '0901234567',
+                    'address': 'Số 12 Chùa Bộc, Đống Đa, Hà Nội',
+                    'status': 'completed',
+                    'created_at': now - timedelta(days=25),
+                    'items': [
+                        ('iPhone 15 Pro Max 256GB', 1),
+                        ('Tai nghe Sony WH-1000XM5', 1)
+                    ]
+                },
+                {
+                    'user_id': user2.id,
+                    'recipient_name': 'Hoàng Nam',
+                    'phone': '0918889999',
+                    'address': 'Tòa Landmark 81, Bình Thạnh, TP.HCM',
+                    'status': 'completed',
+                    'created_at': now - timedelta(days=15),
+                    'items': [
+                        ('MacBook Air M2 13.6 inch 256GB', 1),
+                        ('Chuột không dây Logitech MX Master 3S', 1)
+                    ]
+                },
+                {
+                    'user_id': user1.id,
+                    'recipient_name': 'Nguyễn Văn Khách',
+                    'phone': '0901234567',
+                    'address': 'Số 88 Cầu Giấy, Hà Nội',
+                    'status': 'pending',
+                    'created_at': now - timedelta(hours=3),
+                    'items': [
+                        ('Bàn phím cơ Keychron K3 Pro RGB', 1),
+                        ('Chuột không dây Logitech MX Master 3S', 1)
+                    ]
+                },
+                {
+                    'user_id': None,
+                    'recipient_name': 'Trần Thị Thu Trang',
+                    'phone': '0987654321',
+                    'address': '45 Lê Duẩn, Quận 1, TP.HCM',
+                    'status': 'pending',
+                    'created_at': now - timedelta(hours=1),
+                    'items': [
+                        ('AirPods Pro 2 USB-C', 2)
+                    ]
+                },
+                {
+                    'user_id': user2.id,
+                    'recipient_name': 'Hoàng Nam',
+                    'phone': '0918889999',
+                    'address': 'Tòa Landmark 81, Bình Thạnh, TP.HCM',
+                    'status': 'cancelled',
+                    'created_at': now - timedelta(days=5),
+                    'items': [
+                        ('Laptop Asus ROG Zephyrus G14', 1)
+                    ]
                 }
-                
-                # Tự động chọn đúng tên cột giá trong OrderItem nếu có
-                if hasattr(OrderItem, 'price'):
-                    item_kwargs['price'] = p.price
-                elif hasattr(OrderItem, 'unit_price'):
-                    item_kwargs['unit_price'] = p.price
-                elif hasattr(OrderItem, 'price_at_purchase'):
-                    item_kwargs['price_at_purchase'] = p.price
+            ]
 
-                item = OrderItem(**item_kwargs)
-                db.session.add(item)
-        
-        db.session.commit()
-        print("=== NẠP THÀNH CÔNG 16 MẶT HÀNG CÔNG NGHỆ & ĐƠN HÀNG MẪU! ===")
+            for o_data in sample_orders:
+                items_spec = o_data.pop('items')
+                total_amount = 0.0
+
+                order = Order(**o_data, total_amount=0.0)
+                db.session.add(order)
+                db.session.flush()
+
+                for prod_name, qty in items_spec:
+                    if prod_name in prod_dict:
+                        p = prod_dict[prod_name]
+                        line_total = p.price * qty
+                        total_amount += line_total
+                        order_item = OrderItem(
+                            order_id=order.id,
+                            product_id=p.id,
+                            quantity=qty,
+                            unit_price=p.price
+                        )
+                        db.session.add(order_item)
+
+                order.total_amount = total_amount
+
+            db.session.commit()
+            print("=> Đã tạo đơn hàng mẫu thành công!")
+
+        print("=> Toàn bộ dữ liệu mẫu (Seed Data) đã sẵn sàng để cả nhóm kiểm thử!")
 
 if __name__ == '__main__':
     seed_data()
