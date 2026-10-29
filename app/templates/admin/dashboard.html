@@ -73,6 +73,166 @@
         </div>
     </div>
 </div>
+
+<!-- Bổ sung vào giao diện Dashboard -->
+<div class="row g-4 mt-2">
+    <!-- Card Biểu đồ Top 5 Sản phẩm Bán chạy -->
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-dark">
+                    <i class="bi bi-trophy text-warning me-2"></i>Top 5 Sản Phẩm Bán Chạy Nhất
+                </span>
+                <span class="badge bg-light text-dark border">Theo số lượng bán</span>
+            </div>
+            <div class="card-body">
+                <canvas id="topProductsChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Đã thêm mb-4 để tạo khoảng trống phía dưới bảng cảnh báo tồn kho -->
+<div class="row g-4 mt-2 mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-dark">
+                    <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Cảnh Báo Sản Phẩm Sắp Hết Hàng
+                </span>
+                <span class="badge bg-danger">Tồn kho &le; 10</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">ID</th>
+                                <th>Tên Sản Phẩm</th>
+                                <th>Danh Mục</th>
+                                <th>Đơn Giá</th>
+                                <th class="text-center">Số Lượng Tồn</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lowStockBody">
+                            <tr>
+                                <td colspan="6" class="text-center py-3 text-muted">
+                                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                    Đang kiểm tra kho hàng...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 1: Các KPI tổng quan nâng cao -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-danger shadow-sm border-0">
+            <div class="card-body py-3">
+                <h6 class="card-title text-uppercase small mb-1">Tỷ Lệ Hủy Đơn</h6>
+                <h3 class="fw-bold mb-0" id="cancellationRate">0%</h3>
+                <small id="cancelledOrdersSub" class="text-white-50">0 / 0 đơn</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-primary shadow-sm border-0">
+            <div class="card-body py-3">
+                <h6 class="card-title text-uppercase small mb-1">Khách Hàng Mới</h6>
+                <h3 class="fw-bold mb-0" id="newCustomersCount">0</h3>
+                <small class="text-white-50">Mua 1 đơn duy nhất</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success shadow-sm border-0">
+            <div class="card-body py-3">
+                <h6 class="card-title text-uppercase small mb-1">Khách Mua Lại</h6>
+                <h3 class="fw-bold mb-0" id="returningCustomersCount">0</h3>
+                <small class="text-white-50">Đã mua &ge; 2 đơn</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-dark bg-warning shadow-sm border-0">
+            <div class="card-body py-3">
+                <h6 class="card-title text-uppercase small mb-1">Trạng Thái Kho</h6>
+                <h3 class="fw-bold mb-0" id="deadStockCount">0 SP</h3>
+                <small class="text-dark-50">Cần xả hàng tồn > 90 ngày</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 2: Biểu đồ Khung giờ cao điểm -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <span class="fw-bold text-dark">
+                    <i class="bi bi-clock-history text-primary me-2"></i>Khung Giờ Đặt Hàng Cao Điểm Trong Ngày
+                </span>
+            </div>
+            <div class="card-body">
+                <canvas id="peakHoursChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 3: Bảng Top Khách hàng & Hàng tồn lâu song song -->
+<div class="row g-4 mb-4">
+    <!-- Top Khách hàng thân thiết -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-2 fw-bold small text-dark">
+                <i class="bi bi-person-heart text-danger me-1"></i> Top 5 Khách Hàng Thân Thiết
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.875rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Khách Hàng</th>
+                                <th class="text-center">Số Đơn</th>
+                                <th class="text-end pe-3">Tổng Chi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topCustomersBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hàng tồn lâu / Chậm bán -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-2 fw-bold small text-dark">
+                <i class="bi bi-box-seam text-secondary me-1"></i> Cảnh Báo Sản Phẩm Tồn Lâu (> 90 Ngày)
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.875rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Sản Phẩm</th>
+                                <th>Đơn Giá</th>
+                                <th class="text-center">Tồn Kho</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deadStockBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
