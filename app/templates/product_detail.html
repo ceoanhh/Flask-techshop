@@ -33,19 +33,27 @@
                 <p class="text-muted mb-4 fs-6" style="line-height: 1.6;">{{ product.description }}</p>
 
                 <p class="mb-3"><strong>Tồn kho:</strong>
-                    {% if product.stock is defined %}{{ product.stock }}
-                    {% elif product.quantity is defined %}{{ product.quantity }}
-                    {% else %}15{% endif %} sản phẩm
+                    {% if product.stock_quantity > 0 %}
+                        <span class="text-success fw-bold">{{ product.stock_quantity }}</span> sản phẩm
+                    {% else %}
+                        <span class="badge bg-danger fs-6">Tạm hết hàng</span>
+                    {% endif %}
                 </p>
 
-                <form action="{{ url_for('cart.add_to_cart', product_id=product.id) }}" method="POST" class="mt-4">
+                <form action="{{ url_for('cart.add_to_cart', product_id=product.id) }}" method="POST" class="mt-4 ajax-cart-form">
                     <div class="d-flex align-items-center gap-3 mb-4">
                         <label class="fw-semibold">Số lượng:</label>
-                        <input type="number" name="quantity" value="1" min="1" max="10" class="form-control text-center" style="width: 90px;">
+                        <input type="number" name="quantity" value="1" min="1" max="{{ product.stock_quantity if product.stock_quantity > 0 else 1 }}" class="form-control text-center" style="width: 90px;" {% if product.stock_quantity <= 0 %}disabled{% endif %}>
                     </div>
+                    {% if product.stock_quantity > 0 %}
                     <button type="submit" class="btn btn-primary btn-lg px-4 fw-bold">
                         <i class="bi bi-cart-plus me-2"></i>Thêm vào giỏ hàng
                     </button>
+                    {% else %}
+                    <button type="button" class="btn btn-secondary btn-lg px-4 fw-bold" disabled>
+                        <i class="bi bi-x-circle me-2"></i>Tạm hết hàng
+                    </button>
+                    {% endif %}
                 </form>
             </div>
         </div>

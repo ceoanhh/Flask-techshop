@@ -250,5 +250,53 @@ class TestCartAndAdminTasks(unittest.TestCase):
             reloaded_prod = db.session.get(Product, self.product.id)
             self.assertEqual(reloaded_prod.stock_quantity, 7)
 
+    def test_cart_ajax_operations(self):
+        """Kiểm tra phản hồi JSON cho các thao tác giỏ hàng qua AJAX (không tải lại trang)."""
+        ajax_headers = {'X-Requested-With': 'XMLHttpRequest'}
+
+        # 1. Thêm vào giỏ qua AJAX
+        res = self.client.post(
+            f'/cart/add/{self.product.id}',
+            data={'quantity': 2},
+            headers=ajax_headers
+        )
+        self.assertEqual(res.status_code, 200)
+        json_data = res.get_json()
+        self.assertTrue(json_data['success'])
+        self.assertEqual(json_data['cart_count'], 1)
+        self.assertEqual(json_data['total_quantity'], 2)
+        self.assertEqual(json_data['total_price'], 60000000)
+
+        # 2. Cập nhật số lượng qua AJAX
+        res = self.client.post(
+            f'/cart/update/{self.product.id}',
+            data={'quantity': 3},
+            headers=ajax_headers
+        )
+        self.assertEqual(res.status_code, 200)
+        json_data = res.get_json()
+        self.assertTrue(json_data['success'])
+        self.assertEqual(json_data['total_quantity'], 3)
+        self.assertEqual(json_data['item_total'], 90000000)
+
+        # 3. Xóa sản phẩm qua AJAX
+        res = self.client.post(
+            f'/cart/remove/{self.product.id}',
+            headers=ajax_headers
+        )
+        self.assertEqual(res.status_code, 200)
+        json_data = res.get_json()
+        self.assertTrue(json_data['success'])
+        self.assertEqual(json_data['cart_count'], 0)
+        self.assertEqual(json_data['total_quantity'], 0)
+
+        # 4. Thêm lại rồi Xóa toàn bộ qua AJAX
+        self.client.post(f'/cart/add/{self.product.id}', data={'quantity': 1}, headers=ajax_headers)
+        res = self.client.post('/cart/clear', headers=ajax_headers)
+        self.assertEqual(res.status_code, 200)
+        json_data = res.get_json()
+        self.assertTrue(json_data['success'])
+        self.assertEqual(json_data['cart_count'], 0)
+
 if __name__ == '__main__':
     unittest.main()

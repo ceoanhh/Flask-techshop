@@ -19,3 +19,15 @@ body {
     font-size: 1.5rem;
     letter-spacing: 0.5px;
 }
+
+/* Hiệu ứng nhịp nảy cho Badge giỏ hàng khi có sản phẩm mới */
+.badge-bounce {
+    animation: cartBounce 0.45s ease-in-out;
+}
+
+@keyframes cartBounce {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    40% { transform: translate(-50%, -50%) scale(1.45); }
+    70% { transform: translate(-50%, -50%) scale(0.9); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+}
