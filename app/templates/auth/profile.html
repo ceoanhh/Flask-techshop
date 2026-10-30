@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block title %}Hồ Sơ Cá Nhân - TechShop{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- CỘT TRÁI: THẺ THÔNG TIN TÓM TẮT & HOẠT ĐỘNG -->
+    <div class="col-lg-4">
+        <!-- Thẻ đại diện cá nhân -->
+        <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4">
+            <div class="bg-primary text-white text-center py-4 px-3 position-relative" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
+                <div class="mb-2">
+                    <div class="d-inline-flex justify-content-center align-items-center rounded-circle bg-white text-primary shadow" style="width: 85px; height: 85px; font-size: 2.5rem;">
+                        <i class="bi bi-person-fill"></i>
+                    </div>
+                </div>
+                <h4 class="fw-bold mb-1">{{ current_user.username }}</h4>
+                <div>
+                    {% if current_user.role == 'admin' %}
+                        <span class="badge bg-warning text-dark px-3 py-1 rounded-pill fw-bold shadow-sm">
+                            <i class="bi bi-shield-lock-fill me-1"></i> Quản Trị Viên (Admin)
+                        </span>
+                    {% else %}
+                        <span class="badge bg-light text-primary px-3 py-1 rounded-pill fw-bold shadow-sm">
+                            <i class="bi bi-person-check-fill me-1"></i> Khách Hàng Thân Thiết
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card-body p-3">
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted"><i class="bi bi-envelope text-primary me-2"></i>Email:</span>
+                        <strong class="text-dark text-truncate" style="max-width: 190px;" title="{{ current_user.email }}">{{ current_user.email }}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted"><i class="bi bi-telephone text-success me-2"></i>Số điện thoại:</span>
+                        {% if current_user.phone %}
+                            <strong class="text-dark font-monospace">{{ current_user.phone }}</strong>
+                        {% else %}
+                            <span class="text-warning fst-italic">Chưa cập nhật</span>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted"><i class="bi bi-calendar-event text-secondary me-2"></i>Ngày tham gia:</span>
+                        <span class="text-dark">{{ current_user.created_at.strftime('%d/%m/%Y') }}</span>
+                    </li>
+                </ul>
+
+                <hr class="my-3">
+
+                <!-- Thống kê nhanh hoạt động mua sắm -->
+                <h6 class="fw-bold text-dark small text-uppercase mb-3">
+                    <i class="bi bi-bar-chart-fill text-primary me-1"></i> Hoạt Động Mua Sắm
+                </h6>
+                <div class="row g-2 text-center mb-3">
+                    <div class="col-4">
+                        <div class="p-2 border rounded-3 bg-light">
+                            <div class="fw-bold fs-5 text-primary">{{ total_orders }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">Tổng đơn</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 border rounded-3 bg-light">
+                            <div class="fw-bold fs-5 text-success">{{ completed_count }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">Hoàn tất</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 border rounded-3 bg-light">
+                            <div class="fw-bold fs-6 text-danger">{{ "{:,.0f}".format(total_spent // 1000) }}k</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">Đã chi</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Các liên kết nhanh -->
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('cart.order_tracking') }}" class="btn btn-outline-primary btn-sm fw-semibold">
+                        <i class="bi bi-clock-history me-1"></i> Xem Tất Cả Đơn Hàng Của Tôi
+                    </a>
+                    {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-warning btn-sm fw-bold">
+                        <i class="bi bi-speedometer2 me-1"></i> Đến Bảng Điều Khiển Admin
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CỘT PHẢI: CÁC TAB CHỨC NĂNG (CHỈNH SỬA THÔNG TIN, ĐỔI MẬT KHẨU, ĐƠN GẦN ĐÂY) -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+            <!-- Nav Tabs -->
+            <div class="card-header bg-white border-bottom p-0">
+                <ul class="nav nav-tabs card-header-tabs m-0 border-bottom-0" id="profileTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link py-3 px-4 fw-bold {% if active_tab == 'info' %}active text-primary{% else %}text-muted{% endif %}" 
+                                id="info-tab" data-bs-toggle="tab" data-bs-target="#info-pane" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'info' else 'false' }}">
+                            <i class="bi bi-person-lines-fill me-1"></i> Thông Tin Cá Nhân
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link py-3 px-4 fw-bold {% if active_tab == 'password' %}active text-primary{% else %}text-muted{% endif %}" 
+                                id="password-tab" data-bs-toggle="tab" data-bs-target="#password-pane" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'password' else 'false' }}">
+                            <i class="bi bi-shield-lock me-1"></i> Đổi Mật Khẩu
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link py-3 px-4 fw-bold {% if active_tab == 'orders' %}active text-primary{% else %}text-muted{% endif %}" 
+                                id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-pane" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'orders' else 'false' }}">
+                            <i class="bi bi-bag-check me-1"></i> Đơn Hàng Gần Đây ({{ recent_orders|length }})
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card-body p-4">
+                <div class="tab-content" id="profileTabContent">
+
+                    <!-- TAB 1: CHỈNH SỬA THÔNG TIN CÁ NHÂN -->
+                    <div class="tab-pane fade {% if active_tab == 'info' %}show active{% endif %}" id="info-pane" role="tabpanel" aria-labelledby="info-tab">
+                        <h5 class="fw-bold text-dark mb-1">Cập Nhật Thông Tin Cá Nhân</h5>
+                        <p class="text-muted small mb-4">Thay đổi tên hiển thị, địa chỉ email và số điện thoại liên lạc của bạn.</p>
+
+                        <form action="{{ url_for('auth.profile') }}" method="POST">
+                            <input type="hidden" name="action" value="update_info">
+
+                            <div class="row g-3">
+                                <!-- Tên người dùng -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-secondary small">Tên đăng nhập (Username) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light text-muted"><i class="bi bi-person"></i></span>
+                                        <input type="text" name="username" class="form-control" value="{{ current_user.username }}" required>
+                                    </div>
+                                    <small class="text-muted" style="font-size: 0.75rem;">Dùng để đăng nhập hoặc hiển thị lời chào trên web.</small>
+                                </div>
+
+                                <!-- Email -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-secondary small">Địa chỉ Email <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light text-muted"><i class="bi bi-envelope"></i></span>
+                                        <input type="email" name="email" class="form-control" value="{{ current_user.email }}" required>
+                                    </div>
+                                    <small class="text-muted" style="font-size: 0.75rem;">Dùng để nhận thông báo đơn hàng và mã OTP khôi phục.</small>
+                                </div>
+
+                                <!-- Số điện thoại -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-secondary small">Số điện thoại liên lạc</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light text-muted"><i class="bi bi-telephone"></i></span>
+                                        <input type="tel" name="phone" class="form-control font-monospace" value="{{ current_user.phone or '' }}" placeholder="vd: 0988888888">
+                                    </div>
+                                    <small class="text-muted" style="font-size: 0.75rem;">Chuẩn 10 số Việt Nam (03, 05, 07, 08, 09). Dùng để nhận hàng & liên kết đơn.</small>
+                                </div>
+
+                                <!-- Vai trò tài khoản -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-secondary small">Loại tài khoản</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light text-muted"><i class="bi bi-shield-check"></i></span>
+                                        <input type="text" class="form-control bg-light" value="{{ 'Quản trị viên (Admin)' if current_user.role == 'admin' else 'Khách hàng (Customer)' }}" readonly>
+                                    </div>
+                                    <small class="text-muted" style="font-size: 0.75rem;">Quyền hạn được phân quyền bởi hệ thống.</small>
+                                </div>
+
+                                {% if not current_user.phone %}
+                                <div class="col-12">
+                                    <div class="alert alert-info py-2 px-3 small d-flex align-items-center mb-0">
+                                        <i class="bi bi-info-circle-fill fs-5 text-info me-2"></i>
+                                        <div>
+                                            <strong>Gợi ý:</strong> Hãy cập nhật <strong>Số điện thoại</strong> để thuận tiện hơn khi đặt hàng và tự động đồng bộ hóa toàn bộ lịch sử mua hàng trước đây của bạn.
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <div class="col-12 pt-2">
+                                    <button type="submit" class="btn btn-primary fw-bold px-4 py-2 shadow-sm">
+                                        <i class="bi bi-check2-circle me-1"></i> Lưu Thay Đổi
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- TAB 2: ĐỔI MẬT KHẨU -->
+                    <div class="tab-pane fade {% if active_tab == 'password' %}show active{% endif %}" id="password-pane" role="tabpanel" aria-labelledby="password-tab">
+                        <h5 class="fw-bold text-dark mb-1">Đổi Mật Khẩu Bảo Mật</h5>
+                        <p class="text-muted small mb-4">Để đảm bảo an toàn tài khoản, vui lòng không chia sẻ mật khẩu của bạn với bất kỳ ai.</p>
+
+                        <form action="{{ url_for('auth.profile') }}" method="POST">
+                            <input type="hidden" name="action" value="change_password">
+
+                            <div class="row g-3" style="max-width: 500px;">
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold text-secondary small">Mật khẩu hiện tại <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light text-muted"><i class="bi bi-lock"></i></span>
+                                        <input type="password" name="current_password" class="form-control" placeholder="Nhập mật khẩu đang dùng" required>
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold text-secondary small">Mật khẩu mới <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light text-muted"><i class="bi bi-key"></i></span>
+                                        <input type="password" name="new_password" class="form-control" placeholder="Tối thiểu 6 ký tự" minlength="6" required>
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold text-secondary small">Xác nhận mật khẩu mới <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light text-muted"><i class="bi bi-check2-all"></i></span>
+                                        <input type="password" name="confirm_password" class="form-control" placeholder="Nhập lại mật khẩu mới" minlength="6" required>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 pt-2">
+                                    <button type="submit" class="btn btn-warning fw-bold px-4 py-2 shadow-sm text-dark">
+                                        <i class="bi bi-shield-check me-1"></i> Cập Nhật Mật Khẩu
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- TAB 3: ĐƠN HÀNG GẦN ĐÂY -->
+                    <div class="tab-pane fade {% if active_tab == 'orders' %}show active{% endif %}" id="orders-pane" role="tabpanel" aria-labelledby="orders-tab">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">Đơn Hàng Gần Đây Của Bạn</h5>
+                                <p class="text-muted small mb-0">Hiển thị tối đa 5 đơn hàng mới nhất.</p>
+                            </div>
+                            <a href="{{ url_for('cart.order_tracking') }}" class="btn btn-sm btn-outline-primary fw-semibold">
+                                <i class="bi bi-arrow-right-circle me-1"></i> Xem Tất Cả
+                            </a>
+                        </div>
+
+                        {% if recent_orders %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle border rounded-3 overflow-hidden mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="py-2">Mã đơn</th>
+                                        <th class="py-2">Ngày đặt</th>
+                                        <th class="py-2">Người nhận</th>
+                                        <th class="py-2 text-end">Tổng tiền</th>
+                                        <th class="py-2 text-center">Trạng thái</th>
+                                        <th class="py-2 text-center">Thanh toán</th>
+                                        <th class="py-2 text-end">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for o in recent_orders %}
+                                    <tr>
+                                        <td class="fw-bold text-primary font-monospace">#{{ o.id }}</td>
+                                        <td class="text-muted small">{{ o.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                        <td>
+                                            <div class="fw-semibold text-dark">{{ o.recipient_name }}</div>
+                                            <div class="text-muted small">{{ o.phone }}</div>
+                                        </td>
+                                        <td class="text-end fw-bold text-danger">{{ "{:,.0f}".format(o.total_amount) }} đ</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-{{ o.status_badge_class }}">{{ o.status_label }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if o.payment_method == 'qr_code' %}
+                                                <span class="badge bg-{{ o.payment_status_badge_class }}">{{ o.payment_status_label }}</span>
+                                            {% else %}
+                                                <span class="badge bg-light text-dark border">COD</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <a href="{{ url_for('cart.order_tracking', q=o.id) }}" class="btn btn-sm btn-outline-primary py-1 px-2" title="Theo dõi chi tiết">
+                                                <i class="bi bi-eye"></i> Xem
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5 bg-light rounded-3 border">
+                            <i class="bi bi-cart-x text-muted display-4 mb-2 d-block"></i>
+                            <h6 class="fw-bold text-dark">Bạn chưa có đơn hàng nào!</h6>
+                            <p class="text-muted small mb-3">Khám phá các sản phẩm công nghệ tuyệt vời và đặt hàng ngay.</p>
+                            <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-sm fw-bold px-3 py-2">
+                                <i class="bi bi-bag-plus me-1"></i> Bắt Đầu Mua Sắm
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

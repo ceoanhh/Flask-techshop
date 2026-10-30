@@ -1,4 +1,4 @@
-from flask import render_template, request
+from flask import render_template, request, redirect, url_for
 from app.main import bp
 from app.models import Product, Category
 
@@ -39,3 +39,8 @@ def index():
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
     return render_template('product_detail.html', product=product)
+
+@bp.route('/profile')
+def profile_shortcut():
+    """Điều hướng nhanh đến trang hồ sơ cá nhân."""
+    return redirect(url_for('auth.profile'))

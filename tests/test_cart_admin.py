@@ -745,5 +745,91 @@ class TestCartAndAdminTasks(unittest.TestCase):
         p_final = db.session.get(Product, self.product.id)
         self.assertEqual(p_final.stock_quantity, 10)
 
+    def test_profile_requires_login(self):
+        """Khách vãng lai chưa đăng nhập truy cập /auth/profile phải bị chuyển hướng đến trang đăng nhập."""
+        res = self.client.get('/auth/profile')
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/auth/login', res.headers.get('Location', ''))
+
+    def test_view_and_update_profile_info(self):
+        """Đăng nhập xem hồ sơ và chỉnh sửa thông tin (số điện thoại, email, tên người dùng)."""
+        # Đăng nhập
+        self.client.post('/auth/login', data={'login_id': 'user@test.vn', 'password': 'user123'})
+
+        # Xem trang hồ sơ
+        res = self.client.get('/auth/profile')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Hồ Sơ Cá Nhân'.encode('utf-8'), res.data)
+        self.assertIn(self.customer.username.encode('utf-8'), res.data)
+
+        # Cập nhật số điện thoại và thông tin
+        res_update = self.client.post('/auth/profile', data={
+            'action': 'update_info',
+            'username': 'customer_updated',
+            'email': 'customer_updated@test.vn',
+            'phone': '0934567890'
+        }, follow_redirects=True)
+        self.assertEqual(res_update.status_code, 200)
+        self.assertIn('Cập nhật thông tin hồ sơ thành công'.encode('utf-8'), res_update.data)
+
+        # Kiểm tra database
+        updated_user = db.session.get(User, self.customer.id)
+        self.assertEqual(updated_user.username, 'customer_updated')
+        self.assertEqual(updated_user.email, 'customer_updated@test.vn')
+        self.assertEqual(updated_user.phone, '0934567890')
+
+    def test_update_profile_validation_conflicts(self):
+        """Kiểm tra validation khi cập nhật hồ sơ: sai định dạng SĐT, trùng lặp với người dùng khác."""
+        self.client.post('/auth/login', data={'login_id': 'user@test.vn', 'password': 'user123'})
+
+        # 1. Số điện thoại sai định dạng
+        res_invalid_phone = self.client.post('/auth/profile', data={
+            'action': 'update_info',
+            'username': 'user_test',
+            'email': 'user@test.vn',
+            'phone': '012345'
+        }, follow_redirects=True)
+        self.assertIn('Số điện thoại không đúng chuẩn 10 chữ số'.encode('utf-8'), res_invalid_phone.data)
+
+        # 2. Trùng lặp email với Admin
+        res_conflict_email = self.client.post('/auth/profile', data={
+            'action': 'update_info',
+            'username': 'user_test',
+            'email': 'admin@test.vn',
+            'phone': '0912345678'
+        }, follow_redirects=True)
+        self.assertIn('đã được đăng ký cho một tài khoản khác'.encode('utf-8'), res_conflict_email.data)
+
+    def test_change_password_in_profile(self):
+        """Kiểm tra chức năng đổi mật khẩu trong hồ sơ cá nhân."""
+        self.client.post('/auth/login', data={'login_id': 'user@test.vn', 'password': 'user123'})
+
+        # 1. Nhập sai mật khẩu hiện tại
+        res_wrong = self.client.post('/auth/profile', data={
+            'action': 'change_password',
+            'current_password': 'sai_mat_khau',
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
+        }, follow_redirects=True)
+        self.assertIn('Mật khẩu hiện tại không chính xác'.encode('utf-8'), res_wrong.data)
+
+        # 2. Đổi mật khẩu thành công
+        res_success = self.client.post('/auth/profile', data={
+            'action': 'change_password',
+            'current_password': 'user123',
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
+        }, follow_redirects=True)
+        self.assertIn('Đổi mật khẩu thành công'.encode('utf-8'), res_success.data)
+
+        # 3. Đăng xuất và đăng nhập lại bằng mật khẩu mới
+        self.client.get('/auth/logout')
+        res_login_new = self.client.post('/auth/login', data={
+            'login_id': 'user@test.vn',
+            'password': 'newpassword123'
+        }, follow_redirects=True)
+        self.assertEqual(res_login_new.status_code, 200)
+        self.assertIn('đã đăng nhập'.encode('utf-8'), res_login_new.data)
+
 if __name__ == '__main__':
     unittest.main()

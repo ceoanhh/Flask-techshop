@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}Tra Cứu Đơn Hàng & Lịch Sử Mua Hàng - TechShop{% endblock %}
+{% block title %}{% if current_user.is_authenticated and not search_query %}Đơn Hàng Của Tôi{% else %}Tra Cứu Đơn Hàng{% endif %} - TechShop{% endblock %}
 
 {% block content %}
 <div class="container py-2">
-    <!-- Khung Card Tra Cứu theo phong cách Đăng Ký -->
+    <!-- Khung Card Tra Cứu (hiển thị khi chưa đăng nhập hoặc khi đang tìm kiếm từ khóa cụ thể) -->
+    {% if not current_user.is_authenticated or search_query %}
     <div class="row justify-content-center mb-4">
         <div class="col-md-6 col-lg-5">
             <div class="card shadow border-0 rounded-3">
@@ -48,6 +49,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Kết quả hiển thị bên dưới Card -->
     <div class="row justify-content-center">

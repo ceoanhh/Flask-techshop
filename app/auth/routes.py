@@ -437,3 +437,126 @@ def resend_reset_otp():
         'target': target,
         'cooldown_seconds': 60
     })
+
+
+# ====================================================
+# 4. HỒ SƠ CÁ NHÂN (XEM VÀ CHỈNH SỬA THÔNG TIN & ĐỔI MẬT KHẨU)
+# ====================================================
+
+@bp.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    """Xem và chỉnh sửa thông tin hồ sơ cá nhân và đổi mật khẩu."""
+    active_tab = request.args.get('tab', 'info')
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'update_info')
+
+        if action == 'update_info':
+            username = request.form.get('username', '').strip()
+            email = request.form.get('email', '').strip().lower()
+            phone_raw = request.form.get('phone', '').strip()
+            phone = clean_identifier(phone_raw)
+
+            # 1. Kiểm tra Username
+            if not username:
+                flash('Tên người dùng (Username) không được để trống!', 'danger')
+                return redirect(url_for('auth.profile', tab='info'))
+
+            if len(username) < 3 or len(username) > 64:
+                flash('Tên người dùng phải có độ dài từ 3 đến 64 ký tự!', 'warning')
+                return redirect(url_for('auth.profile', tab='info'))
+
+            # 2. Kiểm tra Email
+            if not email or '@' not in email or '.' not in email.split('@')[-1]:
+                flash('Địa chỉ Email không đúng định dạng hợp lệ!', 'danger')
+                return redirect(url_for('auth.profile', tab='info'))
+
+            # 3. Kiểm tra Số điện thoại nếu có nhập
+            if phone:
+                if not re.match(VIETNAM_PHONE_REGEX, phone):
+                    flash('Số điện thoại không đúng chuẩn 10 chữ số của các nhà mạng Việt Nam (đầu 03, 05, 07, 08, 09)!', 'danger')
+                    return redirect(url_for('auth.profile', tab='info'))
+
+            # 4. Kiểm tra trùng lặp với tài khoản khác
+            conflict_username = User.query.filter(User.username == username, User.id != current_user.id).first()
+            if conflict_username:
+                flash(f'Tên người dùng "{username}" đã được sử dụng bởi một tài khoản khác!', 'danger')
+                return redirect(url_for('auth.profile', tab='info'))
+
+            conflict_email = User.query.filter(User.email == email, User.id != current_user.id).first()
+            if conflict_email:
+                flash(f'Địa chỉ Email "{email}" đã được đăng ký cho một tài khoản khác!', 'danger')
+                return redirect(url_for('auth.profile', tab='info'))
+
+            if phone:
+                conflict_phone = User.query.filter(User.phone == phone, User.id != current_user.id).first()
+                if conflict_phone:
+                    flash(f'Số điện thoại "{phone}" đã được liên kết với một tài khoản khác!', 'danger')
+                    return redirect(url_for('auth.profile', tab='info'))
+
+            # 5. Lưu cập nhật
+            current_user.username = username
+            current_user.email = email
+            current_user.phone = phone if phone else None
+
+            # Tự động đồng bộ các đơn hàng cũ trùng số điện thoại này (nếu có đơn vãng lai)
+            linked_count = 0
+            if phone:
+                unlinked_orders = Order.query.filter_by(phone=phone, user_id=None).all()
+                for o in unlinked_orders:
+                    o.user_id = current_user.id
+                    linked_count += 1
+
+            db.session.commit()
+            msg = 'Cập nhật thông tin hồ sơ thành công!'
+            if linked_count > 0:
+                msg += f' Đã tự động đồng bộ {linked_count} đơn hàng thuộc số điện thoại {phone} vào tài khoản của bạn.'
+            flash(msg, 'success')
+            return redirect(url_for('auth.profile', tab='info'))
+
+        elif action == 'change_password':
+            current_password = request.form.get('current_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
+
+            if not current_password:
+                flash('Vui lòng nhập mật khẩu hiện tại để xác thực!', 'warning')
+                return redirect(url_for('auth.profile', tab='password'))
+
+            if not current_user.check_password(current_password):
+                flash('Mật khẩu hiện tại không chính xác!', 'danger')
+                return redirect(url_for('auth.profile', tab='password'))
+
+            if len(new_password) < 6:
+                flash('Mật khẩu mới phải có ít nhất 6 ký tự!', 'warning')
+                return redirect(url_for('auth.profile', tab='password'))
+
+            if new_password != confirm_password:
+                flash('Mật khẩu xác nhận mới không trùng khớp!', 'danger')
+                return redirect(url_for('auth.profile', tab='password'))
+
+            if current_user.check_password(new_password):
+                flash('Mật khẩu mới không được trùng với mật khẩu hiện tại!', 'warning')
+                return redirect(url_for('auth.profile', tab='password'))
+
+            current_user.set_password(new_password)
+            db.session.commit()
+            flash('Đổi mật khẩu thành công! Bạn có thể sử dụng mật khẩu mới cho các lần đăng nhập tiếp theo.', 'success')
+            return redirect(url_for('auth.profile', tab='password'))
+
+    # Dữ liệu hiển thị trang hồ sơ
+    orders_query = current_user.orders.order_by(Order.created_at.desc())
+    total_orders = orders_query.count()
+    recent_orders = orders_query.limit(5).all()
+    completed_orders = [o for o in current_user.orders if o.status == 'completed']
+    total_spent = sum(o.total_amount for o in completed_orders)
+
+    return render_template(
+        'auth/profile.html',
+        total_orders=total_orders,
+        recent_orders=recent_orders,
+        total_spent=total_spent,
+        completed_count=len(completed_orders),
+        active_tab=active_tab
+    )

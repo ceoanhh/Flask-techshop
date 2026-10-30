@@ -45,3 +45,17 @@ input[type="number"].no-spinner::-webkit-inner-spin-button {
 input[type="number"].no-spinner {
     -moz-appearance: textfield;
 }
+
+/* Đảm bảo Navbar và Menu thả xuống (Dropdown) luôn nổi trên các thành phần trang */
+.navbar.sticky-top {
+    z-index: 1030 !important;
+}
+
+.navbar .dropdown-menu {
+    z-index: 1035 !important;
+}
+
+/* Hạ z-index của các thẻ tóm tắt đơn hàng sticky-top trong trang để không che lấp dropdown */
+.card.sticky-top {
+    z-index: 10 !important;
+}
