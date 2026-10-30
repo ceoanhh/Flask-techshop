@@ -123,6 +123,127 @@ class TestCartAndAdminTasks(unittest.TestCase):
                 raw_cart = CartService.get_raw_cart()
                 self.assertEqual(len(raw_cart), 0)
 
+    def test_selective_checkout_retains_unselected_items(self):
+        """Kiểm tra tính năng mua sản phẩm được tích chọn: chỉ thanh toán món được chọn, món còn lại giữ nguyên trong giỏ."""
+        # Tạo thêm sản phẩm thứ 2
+        prod2 = Product(
+            name='MacBook Pro M3',
+            category_id=self.category.id,
+            price=45000000,
+            stock_quantity=5,
+            description='Test laptop',
+            image_url='laptop.png'
+        )
+        db.session.add(prod2)
+        db.session.commit()
+
+        with self.app.test_request_context():
+            with self.client.session_transaction() as sess:
+                # Thêm cả 2 sản phẩm vào giỏ
+                CartService.add_to_cart(self.product.id, quantity=2)
+                CartService.add_to_cart(prod2.id, quantity=1)
+
+                # Giỏ hàng hiện có 2 món
+                items, total_price, total_qty = CartService.get_cart_items()
+                self.assertEqual(len(items), 2)
+                self.assertEqual(total_qty, 3)
+
+                # Khách chỉ chọn mua sản phẩm 1 (self.product.id)
+                selected_items, sel_price, sel_qty = CartService.get_cart_items(selected_ids=[self.product.id])
+                self.assertEqual(len(selected_items), 1)
+                self.assertEqual(selected_items[0]['product'].id, self.product.id)
+                self.assertEqual(sel_qty, 2)
+                self.assertEqual(sel_price, 60000000)
+
+                # Thực hiện checkout chỉ với sản phẩm 1
+                order, err = CartService.checkout(
+                    recipient_name='Ánh Tester',
+                    phone='0987654321',
+                    address='Hà Nội',
+                    user_id=self.customer.id,
+                    selected_ids=[self.product.id]
+                )
+                self.assertIsNotNone(order)
+                self.assertIsNone(err)
+                self.assertEqual(order.total_amount, 60000000)
+
+                # Sản phẩm 1 bị trừ tồn kho: 10 - 2 = 8
+                p1 = db.session.get(Product, self.product.id)
+                self.assertEqual(p1.stock_quantity, 8)
+
+                # Sản phẩm 2 KHÔNG bị trừ tồn kho: vẫn còn 5
+                p2 = db.session.get(Product, prod2.id)
+                self.assertEqual(p2.stock_quantity, 5)
+
+                # Giỏ hàng VẪN CÒN sản phẩm 2 với số lượng 1
+                raw_cart = CartService.get_raw_cart()
+                self.assertNotIn(str(self.product.id), raw_cart)
+                self.assertIn(str(prod2.id), raw_cart)
+                self.assertEqual(raw_cart[str(prod2.id)], 1)
+
+                # Kiểm tra get_cart_items trả về đúng sản phẩm 2
+                remaining_items, remaining_price, remaining_qty = CartService.get_cart_items()
+                self.assertEqual(len(remaining_items), 1)
+                self.assertEqual(remaining_items[0]['product'].id, prod2.id)
+                self.assertEqual(remaining_qty, 1)
+                self.assertEqual(remaining_price, 45000000)
+
+    def test_cart_selection_persisted_when_browsing_and_adding_more(self):
+        """
+        Kiểm tra kịch bản người dùng:
+        - Có 3 sản phẩm, user chọn SP 1 và 2 (bỏ chọn SP 3).
+        - Thoát ra xem hàng và thêm SP 4 vào giỏ.
+        - Quay lại giỏ hàng: SP 1 và 2 VẪN GIỮ ĐƯỢC CHỌN, SP 3 vẫn bị bỏ chọn.
+        """
+        # Tạo thêm SP 2, SP 3, SP 4
+        p2 = Product(name='MacBook Pro M3', category_id=self.category.id, price=40000000, stock_quantity=5, description='laptop', image_url='p2.png')
+        p3 = Product(name='AirPods Pro 2', category_id=self.category.id, price=5000000, stock_quantity=10, description='audio', image_url='p3.png')
+        p4 = Product(name='Apple Watch Ultra', category_id=self.category.id, price=20000000, stock_quantity=8, description='watch', image_url='p4.png')
+        db.session.add_all([p2, p3, p4])
+        db.session.commit()
+
+        # Thêm 3 sản phẩm đầu vào giỏ: SP 1, SP 2, SP 3
+        self.client.post(f'/cart/add/{self.product.id}', data={'quantity': 1})
+        self.client.post(f'/cart/add/{p2.id}', data={'quantity': 1})
+        self.client.post(f'/cart/add/{p3.id}', data={'quantity': 1})
+
+        # Vào giỏ hàng lần đầu: cả 3 sản phẩm được chọn
+        res = self.client.get('/cart/')
+        self.assertEqual(res.status_code, 200)
+
+        # Người dùng bỏ chọn SP 3, chỉ giữ lại SP 1 và SP 2
+        res_save = self.client.post('/cart/save-selection', json={'selected': [self.product.id, p2.id]})
+        self.assertEqual(res_save.status_code, 200)
+        self.assertEqual(res_save.get_json()['selected_ids'], [self.product.id, p2.id])
+
+        # Người dùng thoát ra xem hàng và thêm SP 4 vào giỏ hàng
+        res_add4 = self.client.post(f'/cart/add/{p4.id}', data={'quantity': 1})
+        self.assertEqual(res_add4.status_code, 302)
+
+        # Người dùng quay lại giỏ hàng
+        res_cart = self.client.get('/cart/')
+        self.assertEqual(res_cart.status_code, 200)
+        html = res_cart.data.decode('utf-8')
+
+        # Kiểm tra URL nút checkout truyền đúng danh sách ID đã chọn: 1, 2, 4
+        self.assertIn(f'selected={self.product.id},{p2.id},{p4.id}', html)
+        self.assertIn('90,000,000 VNĐ', html)
+
+        # Kiểm tra SP 1 và SP 2 VẪN ĐƯỢC CHỌN (có checked trong row)
+        row_p1 = html.split(f'id="cart-row-{self.product.id}"')[1].split('</tr>')[0]
+        self.assertIn('checked', row_p1)
+
+        row_p2 = html.split(f'id="cart-row-{p2.id}"')[1].split('</tr>')[0]
+        self.assertIn('checked', row_p2)
+
+        # Kiểm tra SP 3 KHÔNG ĐƯỢC CHỌN (không có checked trong row)
+        row_p3 = html.split(f'id="cart-row-{p3.id}"')[1].split('</tr>')[0]
+        self.assertNotIn('checked', row_p3)
+
+        # Kiểm tra SP 4 mới thêm vào CŨNG ĐƯỢC CHỌN (có checked trong row)
+        row_p4 = html.split(f'id="cart-row-{p4.id}"')[1].split('</tr>')[0]
+        self.assertIn('checked', row_p4)
+
     # ------------------------------------------------------------------
     # 2. TEST HTTP ROUTES CHO CART & CHECKOUT
     # ------------------------------------------------------------------
@@ -137,7 +258,13 @@ class TestCartAndAdminTasks(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn(b'iPhone 15 Pro Max', res.data)
 
-        # 3. Đặt hàng qua route POST
+        # 3. Đăng nhập tài khoản trước khi Checkout
+        self.client.post('/auth/login', data={
+            'login_id': 'user@test.vn',
+            'password': 'user123'
+        })
+
+        # 4. Đặt hàng qua route POST
         res = self.client.post('/cart/checkout', data={
             'recipient_name': 'Nguyễn Văn A',
             'phone': '0912345678',
@@ -297,6 +424,182 @@ class TestCartAndAdminTasks(unittest.TestCase):
         json_data = res.get_json()
         self.assertTrue(json_data['success'])
         self.assertEqual(json_data['cart_count'], 0)
+
+    def test_order_tracking(self):
+        """Kiểm tra chức năng tra cứu đơn hàng bằng Số điện thoại hoặc Mã đơn hàng."""
+        # Tạo đơn hàng mẫu
+        order = Order(
+            recipient_name='Lê Văn Test',
+            phone='0988776655',
+            address='Đà Nẵng',
+            total_amount=30000000,
+            status='pending'
+        )
+        db.session.add(order)
+        db.session.commit()
+
+        # 1. Tra cứu bằng số điện thoại
+        res = self.client.get('/cart/tracking?q=0988776655')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b'0988776655', res.data)
+        self.assertIn(f'#Đơn {order.id}'.encode('utf-8'), res.data)
+
+        # 2. Tra cứu bằng mã đơn hàng
+        res = self.client.get(f'/cart/tracking?q={order.id}')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b'0988776655', res.data)
+
+        # 3. Tra cứu không tìm thấy
+        res = self.client.get('/cart/tracking?q=0000000000')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Không tìm thấy đơn hàng'.encode('utf-8'), res.data)
+
+    def test_claim_account_and_link_guest_orders(self):
+        """Kiểm tra cơ chế liên kết tài khoản sau khi mua (Claim Account)."""
+        # Tạo 2 đơn hàng vãng lai cùng số điện thoại 0977112233
+        order1 = Order(recipient_name='Khách 1', phone='0977112233', address='HN', total_amount=1000, user_id=None)
+        order2 = Order(recipient_name='Khách 1', phone='0977112233', address='HN', total_amount=2000, user_id=None)
+        db.session.add_all([order1, order2])
+        db.session.commit()
+
+        self.assertIsNone(order1.user_id)
+        self.assertIsNone(order2.user_id)
+
+        # Thực hiện Claim Account
+        res = self.client.post(f'/cart/claim-account/{order1.id}', data={
+            'username': 'claimuser',
+            'email': 'claim@techshop.vn',
+            'password': 'password123',
+            'confirm_password': 'password123'
+        }, follow_redirects=True)
+
+        self.assertEqual(res.status_code, 200)
+
+        # Kiểm tra user mới đã được tạo
+        new_user = User.query.filter_by(username='claimuser').first()
+        self.assertIsNotNone(new_user)
+
+        # Kiểm tra cả 2 đơn hàng cũ đã được tự động liên kết vào new_user.id
+        reloaded_o1 = db.session.get(Order, order1.id)
+        reloaded_o2 = db.session.get(Order, order2.id)
+        self.assertEqual(reloaded_o1.user_id, new_user.id)
+        self.assertEqual(reloaded_o2.user_id, new_user.id)
+
+    def test_register_and_forgot_password_flow(self):
+        """Kiểm tra toàn bộ luồng đăng ký 2 bước (OTP SĐT) và quên mật khẩu 2 bước (bằng Email có dấu chấm)."""
+        # --- LUỒNG 1: ĐĂNG KÝ 2 BƯỚC ---
+        # Bước 1.1: Gửi form đăng ký -> Tự động sinh OTP và redirect sang verify-register
+        res = self.client.post('/auth/register', data={
+            'username': 'otpuser',
+            'email': 'otpuser@test.vn',
+            'phone': '0981234567',
+            'password': 'password123',
+            'confirm_password': 'password123'
+        }, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/auth/verify-register', res.headers['Location'])
+
+        # Lấy OTP sinh tự động từ session
+        with self.client.session_transaction() as sess:
+            register_otp = sess['register_otp']
+
+        # Bước 1.2: Nhập mã OTP để xác nhận và kích hoạt tài khoản
+        res = self.client.post('/auth/verify-register', data={'otp': register_otp}, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        created_user = User.query.filter_by(username='otpuser').first()
+        self.assertIsNotNone(created_user)
+        self.assertEqual(created_user.phone, '0981234567')
+
+        # --- LUỒNG 2: QUÊN MẬT KHẨU 2 BƯỚC (BẰNG EMAIL CÓ DẤU CHẤM) ---
+        # Bước 2.1: Đăng xuất tài khoản
+        self.client.get('/auth/logout')
+
+        # Bước 2.2: Trang 1 - Nhập Email và yêu cầu gửi OTP
+        res = self.client.post('/auth/forgot-password', data={'identifier': 'otpuser@test.vn'}, follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/auth/reset-password', res.headers['Location'])
+
+        with self.client.session_transaction() as sess:
+            reset_otp = sess['reset_otp']
+
+        # Bước 2.3: Trang 2 - Nhập OTP và đặt lại mật khẩu mới
+        res = self.client.post('/auth/reset-password', data={
+            'otp': reset_otp,
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        # Bước 2.4: Đăng nhập lại với mật khẩu mới bằng SĐT
+        res = self.client.post('/auth/login', data={
+            'login_id': '0981234567',
+            'password': 'newpassword123'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Chào mừng'.encode('utf-8'), res.data)
+
+    def test_forgot_password_cooldown_and_max_5_fails(self):
+        """
+        Kiểm tra:
+        1. Cooldown 60s: Trong 60s thoát ra nhập lại email, mã OTP giữ nguyên không đổi.
+        2. Nhập sai OTP không làm lộ số lần đã sai.
+        3. Nhập sai đủ 5 lần: mã OTP bị hủy và yêu cầu gửi lại mã mới.
+        """
+        # Bước 1: Yêu cầu OTP lần 1
+        self.client.post('/auth/forgot-password', data={'identifier': self.customer.email})
+        with self.client.session_transaction() as sess:
+            otp1 = sess['reset_otp']
+            self.assertIsNotNone(otp1)
+
+        # Bước 2: Thoát ra ngoài và bấm gửi lại ngay trong 60s -> mã giữ nguyên
+        self.client.post('/auth/forgot-password', data={'identifier': self.customer.email})
+        with self.client.session_transaction() as sess:
+            otp2 = sess['reset_otp']
+            self.assertEqual(otp1, otp2)  # Không sinh mã mới, vẫn dùng mã cũ
+
+        # Bước 3: Thử bấm resend API trong 60s -> Bị chặn 429
+        res_resend_blocked = self.client.post('/auth/api/resend-reset-otp')
+        self.assertEqual(res_resend_blocked.status_code, 429)
+
+        # Bước 4: Nhập sai 4 lần đầu qua AJAX
+        ajax_headers = {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+        for i in range(1, 5):
+            res_wrong = self.client.post('/auth/reset-password', data={
+                'otp': '999999',
+                'new_password': 'password678',
+                'confirm_password': 'password678'
+            }, headers=ajax_headers)
+            self.assertEqual(res_wrong.status_code, 400)
+            data = res_wrong.get_json()
+            self.assertFalse(data['success'])
+            self.assertIn('Mã OTP không chính xác', data['message'])
+            # Không hiển thị số lần sai
+            self.assertNotIn(str(i), data['message'])
+
+        # Bước 5: Nhập sai lần thứ 5 -> Mã OTP bị hủy
+        res_wrong_5 = self.client.post('/auth/reset-password', data={
+            'otp': '999999',
+            'new_password': 'password678',
+            'confirm_password': 'password678'
+        }, headers=ajax_headers)
+        self.assertEqual(res_wrong_5.status_code, 400)
+        data5 = res_wrong_5.get_json()
+        self.assertTrue(data5.get('otp_invalidated'))
+        self.assertIn('đã bị hủy', data5['message'])
+
+        # Kiểm tra session không còn reset_otp
+        with self.client.session_transaction() as sess:
+            self.assertNotIn('reset_otp', sess)
+
+        # Bước 6: Thử nhập lại bằng OTP cũ (otp1) -> Vẫn bị từ chối vì đã hủy
+        res_try_old = self.client.post('/auth/reset-password', data={
+            'otp': otp1,
+            'new_password': 'password678',
+            'confirm_password': 'password678'
+        }, headers=ajax_headers)
+        self.assertEqual(res_try_old.status_code, 400)
+        self.assertIn('đã bị hủy', res_try_old.get_json()['message'])
 
 if __name__ == '__main__':
     unittest.main()

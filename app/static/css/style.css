@@ -31,3 +31,17 @@ body {
     70% { transform: translate(-50%, -50%) scale(0.9); }
     100% { transform: translate(-50%, -50%) scale(1); }
 }
+
+/* Ẩn mũi tên spinner lên/xuống mặc định của ô input number */
+.cart-qty-input::-webkit-outer-spin-button,
+.cart-qty-input::-webkit-inner-spin-button,
+input[type="number"].no-spinner::-webkit-outer-spin-button,
+input[type="number"].no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.cart-qty-input,
+input[type="number"].no-spinner {
+    -moz-appearance: textfield;
+}

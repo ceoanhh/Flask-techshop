@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3 class="fw-bold mb-0"><i class="bi bi-cart3 text-primary"></i> Giỏ Hàng Của Bạn</h3>
     <span class="badge bg-primary fs-6 cart-total-badge {% if not cart_items %}d-none{% endif %}">
-        <span class="cart-total-quantity-badge">{{ total_quantity }}</span> món hàng
+        <span class="cart-total-quantity-badge">{{ cart_total_quantity if cart_total_quantity is defined else total_quantity }}</span> món hàng
     </span>
 </div>
 
@@ -19,9 +19,12 @@
                         <table class="table align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="min-width: 250px;">Sản phẩm</th>
+                                    <th style="width: 45px;" class="text-center">
+                                        <input type="checkbox" class="form-check-input" id="select-all-cart" {% if selected_pids is defined and selected_pids|length == cart_items|length and cart_items|length > 0 %}checked{% endif %} title="Chọn tất cả sản phẩm">
+                                    </th>
+                                    <th style="min-width: 230px;">Sản phẩm</th>
                                     <th>Đơn giá</th>
-                                    <th style="min-width: 150px;">Số lượng</th>
+                                    <th style="min-width: 130px;">Số lượng</th>
                                     <th>Thành tiền</th>
                                     <th class="text-center">Xóa</th>
                                 </tr>
@@ -29,6 +32,15 @@
                             <tbody id="cart-table-body">
                                 {% for item in cart_items %}
                                 <tr id="cart-row-{{ item.product.id }}">
+                                    <td class="text-center">
+                                        <input type="checkbox" 
+                                               class="form-check-input cart-item-checkbox" 
+                                               value="{{ item.product.id }}" 
+                                               data-product-id="{{ item.product.id }}" 
+                                               data-price="{{ item.product.price }}"
+                                               {% if selected_pids is not defined or item.product.id in selected_pids %}checked{% endif %} 
+                                               title="Chọn mua sản phẩm này">
+                                    </td>
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div class="bg-light rounded p-1 text-center me-3 d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; min-width: 55px;">
@@ -54,22 +66,43 @@
                                         <span class="fw-semibold">{{ "{:,.0f}".format(item.product.price) }} VNĐ</span>
                                     </td>
                                     <td>
-                                        <form action="{{ url_for('cart.update_cart', product_id=item.product.id) }}" method="POST" class="d-flex align-items-center cart-update-form" data-product-id="{{ item.product.id }}">
-                                            <input type="number" name="quantity" value="{{ item.quantity }}" min="1" max="{{ item.product.stock_quantity }}" class="form-control form-control-sm text-center me-2 cart-qty-input" style="width: 70px;">
-                                            <button type="submit" class="btn btn-sm btn-outline-primary" title="Cập nhật số lượng">
-                                                <i class="bi bi-arrow-repeat"></i>
+                                        <div class="input-group input-group-sm" style="width: 110px;">
+                                            <button class="btn btn-outline-secondary btn-cart-minus" 
+                                                    type="button" 
+                                                    data-product-id="{{ item.product.id }}"
+                                                    data-url="{{ url_for('cart.update_cart', product_id=item.product.id) }}"
+                                                    title="Giảm 1">
+                                                <i class="bi bi-dash"></i>
                                             </button>
-                                        </form>
+                                            <input type="number" 
+                                                   name="quantity" 
+                                                   value="{{ item.quantity }}" 
+                                                   min="1" 
+                                                   max="{{ item.product.stock_quantity }}" 
+                                                   class="form-control text-center cart-qty-input px-1 no-spinner" 
+                                                   data-product-id="{{ item.product.id }}"
+                                                   data-url="{{ url_for('cart.update_cart', product_id=item.product.id) }}">
+                                            <button class="btn btn-outline-secondary btn-cart-plus" 
+                                                    type="button" 
+                                                    data-product-id="{{ item.product.id }}"
+                                                    data-url="{{ url_for('cart.update_cart', product_id=item.product.id) }}"
+                                                    title="Tăng 1">
+                                                <i class="bi bi-plus"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                     <td>
                                         <span class="text-danger fw-bold" id="item-subtotal-{{ item.product.id }}">{{ "{:,.0f}".format(item.item_total) }} VNĐ</span>
                                     </td>
                                     <td class="text-center">
-                                        <form action="{{ url_for('cart.remove_from_cart', product_id=item.product.id) }}" method="POST" class="cart-remove-form" data-product-id="{{ item.product.id }}" onsubmit="return confirm('Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?');">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Xóa khỏi giỏ">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-danger btn-delete-item" 
+                                                data-product-id="{{ item.product.id }}" 
+                                                data-product-name="{{ item.product.name }}"
+                                                data-url="{{ url_for('cart.remove_from_cart', product_id=item.product.id) }}" 
+                                                title="Xóa khỏi giỏ">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -77,15 +110,22 @@
                         </table>
                     </div>
                 </div>
-                <div class="card-footer bg-white d-flex justify-content-between py-3">
-                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Tiếp tục mua sắm
-                    </a>
-                    <form action="{{ url_for('cart.clear_cart') }}" method="POST" class="cart-clear-form" onsubmit="return confirm('Bạn có chắc muốn làm trống toàn bộ giỏ hàng?');">
-                        <button type="submit" class="btn btn-outline-danger">
+                <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="form-check-label small fw-semibold cursor-pointer" for="select-all-cart">
+                            <i class="bi bi-check2-all me-1"></i>Đã chọn: <span id="selected-items-count" class="text-primary fw-bold fs-6">{{ total_quantity }}</span> sản phẩm
+                        </label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-left"></i> Tiếp tục mua sắm
+                        </a>
+                        <button type="button" 
+                                class="btn btn-outline-danger btn-sm btn-clear-cart" 
+                                data-url="{{ url_for('cart.clear_cart') }}">
                             <i class="bi bi-trash3"></i> Xóa toàn bộ giỏ
                         </button>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -110,8 +150,8 @@
                         <span class="fs-5 fw-bold">Tổng thanh toán:</span>
                         <span class="fs-5 fw-bold text-danger" id="cart-total-price">{{ "{:,.0f}".format(total_price) }} VNĐ</span>
                     </div>
-                    <a href="{{ url_for('cart.checkout') }}" class="btn btn-success btn-lg w-100 fw-bold">
-                        Tiến hành Đặt hàng <i class="bi bi-arrow-right"></i>
+                    <a href="{{ url_for('cart.checkout', selected=selected_pids|join(',')) if selected_pids else 'javascript:void(0)' }}" id="btn-proceed-checkout" class="btn btn-success btn-lg w-100 fw-bold {% if not selected_pids %}disabled opacity-50{% endif %}">
+                        Tiến hành Đặt hàng (<span id="btn-checkout-count">{{ total_quantity }}</span>) <i class="bi bi-arrow-right"></i>
                     </a>
                 </div>
             </div>
@@ -126,5 +166,36 @@
     <a href="{{ url_for('main.index') }}" class="btn btn-primary mt-2">
         <i class="bi bi-bag-check"></i> Khám phá sản phẩm ngay
     </a>
+</div>
+
+<!-- Modal Xác Nhận Xóa Trong Trang Web (Thay thế confirm popup cũ) -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger" id="deleteConfirmModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Xác Nhận Thao Tác
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3">
+                    <i class="bi bi-trash3-fill text-danger" style="font-size: 3.5rem;"></i>
+                </div>
+                <h6 class="fw-bold text-dark mb-2" id="deleteModalTitle">Xóa sản phẩm khỏi giỏ hàng?</h6>
+                <p class="text-muted small mb-0" id="deleteModalDescription">
+                    Sản phẩm này sẽ được xóa khỏi giỏ hàng của bạn.
+                </p>
+            </div>
+            <div class="modal-footer border-top-0 pt-0 justify-content-center gap-2 pb-4">
+                <button type="button" class="btn btn-light border px-4 fw-semibold" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i>Hủy bỏ
+                </button>
+                <button type="button" class="btn btn-danger px-4 fw-bold" id="btnConfirmAction">
+                    <i class="bi bi-trash me-1"></i>Xác nhận xóa
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

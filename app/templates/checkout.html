@@ -12,6 +12,7 @@
             </div>
             <div class="card-body p-4">
                 <form action="{{ url_for('cart.checkout') }}" method="POST">
+                    <input type="hidden" name="selected" value="{{ selected_raw or '' }}">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Họ và tên người nhận <span class="text-danger">*</span></label>
                         <input type="text" name="recipient_name" class="form-control" required 
@@ -21,9 +22,17 @@
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold">Số điện thoại liên hệ <span class="text-danger">*</span></label>
-                        <input type="tel" name="phone" class="form-control" required 
-                               placeholder="Ví dụ: 0912345678">
-                        <div class="form-text">Nhân viên sẽ liên hệ số điện thoại này để xác nhận giao hàng.</div>
+                        <div class="input-group">
+                            <input type="tel" name="phone" class="form-control" required 
+                                   value="{{ current_user.phone if current_user.is_authenticated and current_user.phone else '' }}"
+                                   placeholder="Ví dụ: 0912345678">
+                            {% if current_user.is_authenticated and current_user.phone %}
+                            <span class="input-group-text bg-light text-success fw-semibold">
+                                <i class="bi bi-shield-check me-1"></i>Đã xác thực
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="form-text">Số điện thoại chính chủ đã được xác thực qua OTP của tài khoản.</div>
                     </div>
                     
                     <div class="mb-3">

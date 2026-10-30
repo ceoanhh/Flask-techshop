@@ -71,9 +71,53 @@
                 </table>
             </div>
 
-            <div class="d-flex justify-content-center gap-3">
-                <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg">
-                    <i class="bi bi-house me-1"></i> Quay lại Trang Chủ
+            {% if not current_user.is_authenticated %}
+            <!-- Khối Liên Kết Tài Khoản Sau Khi Mua (Claim Account) -->
+            <div class="card border-primary border-2 bg-light text-start p-4 mb-4 shadow-sm rounded-3">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-primary text-white rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-person-check-fill fs-4"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold text-primary mb-1">Tạo Nhanh Tài Khoản & Lưu Trữ Đơn Hàng</h5>
+                        <p class="text-muted small mb-0">
+                            Bạn vừa đặt hàng với tư cách <strong>Khách vãng lai</strong>. Tạo mật khẩu ngay để tự động liên kết và theo dõi toàn bộ đơn hàng của số điện thoại <strong>{{ order.phone }}</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <form action="{{ url_for('cart.claim_account', order_id=order.id) }}" method="POST" class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small">Tên tài khoản (Username):</label>
+                        <input type="text" name="username" class="form-control" placeholder="vd: {{ order.recipient_name|replace(' ', '')|lower }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small">Email nhận thông báo:</label>
+                        <input type="email" name="email" class="form-control" placeholder="email@example.com" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small">Mật khẩu:</label>
+                        <input type="password" name="password" class="form-control" placeholder="Tối thiểu 6 ký tự" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small">Xác nhận mật khẩu:</label>
+                        <input type="password" name="confirm_password" class="form-control" placeholder="Nhập lại mật khẩu" required>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <button type="submit" class="btn btn-primary fw-bold px-4 py-2">
+                            <i class="bi bi-link-45deg me-1 fs-5"></i> Tạo Tài Khoản & Tự Động Gom Đơn Hàng
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+
+            <div class="d-flex justify-content-center flex-wrap gap-3">
+                <a href="{{ url_for('cart.order_tracking', q=order.id) }}" class="btn btn-outline-primary btn-lg fw-semibold">
+                    <i class="bi bi-truck me-1"></i> Theo Dõi Trạng Thái Đơn Hàng
+                </a>
+                <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg fw-semibold">
+                    <i class="bi bi-house me-1"></i> Tiếp Tục Mua Sắm
                 </a>
             </div>
         </div>

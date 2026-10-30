@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block title %}Tra Cứu Đơn Hàng & Lịch Sử Mua Hàng - TechShop{% endblock %}
+
+{% block content %}
+<div class="container py-2">
+    <!-- Khung Card Tra Cứu theo phong cách Đăng Ký -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow border-0 rounded-3">
+                <div class="card-body p-4">
+                    <h3 class="card-title text-center mb-1 text-primary fw-bold">Tra Cứu Đơn Hàng</h3>
+                    <p class="text-center text-muted small mb-4">
+                        Nhập <strong>Số điện thoại</strong> hoặc <strong>Mã đơn hàng</strong> để kiểm tra
+                    </p>
+
+                    <form action="{{ url_for('cart.order_tracking') }}" method="GET">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Số điện thoại hoặc Mã đơn <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-muted">
+                                    <i class="bi bi-search"></i>
+                                </span>
+                                <input type="text" 
+                                       name="q" 
+                                       value="{{ search_query }}" 
+                                       class="form-control" 
+                                       placeholder="Ví dụ: 0912345678 hoặc 12" 
+                                       required 
+                                       autofocus>
+                            </div>
+                            <div class="form-text">Nhập SĐT để xem tất cả các đơn, hoặc nhập mã để xem 1 đơn cụ thể.</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-2 shadow-sm">
+                            <i class="bi bi-search me-1"></i>Tra Cứu Đơn Hàng
+                        </button>
+                    </form>
+
+                    {% if search_query %}
+                    <div class="text-center mt-3 pt-2 border-top">
+                        <a href="{{ url_for('cart.order_tracking') }}" class="text-decoration-none small text-danger fw-semibold">
+                            <i class="bi bi-x-circle me-1"></i>Xóa bộ lọc tìm kiếm
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kết quả hiển thị bên dưới Card -->
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            {% if orders %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">
+                        {% if search_query %}
+                            Kết quả tra cứu cho: <span class="text-primary">"{{ search_query }}"</span>
+                        {% else %}
+                            Đơn hàng của tài khoản: <span class="text-primary">{{ current_user.username }}</span>
+                        {% endif %}
+                    </h5>
+                    <span class="badge bg-primary px-3 py-2 fs-6">Tìm thấy {{ orders|length }} đơn hàng</span>
+                </div>
+
+                <!-- Danh sách đơn hàng Accordion -->
+                <div class="accordion shadow-sm rounded-3 overflow-hidden" id="ordersAccordion">
+                    {% for order in orders %}
+                    <div class="accordion-item border mb-3 rounded-3 overflow-hidden shadow-sm">
+                        <h2 class="accordion-header" id="heading-{{ order.id }}">
+                            <button class="accordion-button {% if not loop.first %}collapsed{% endif %} bg-light text-dark py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ order.id }}">
+                                <div class="container-fluid p-0">
+                                    <div class="row g-2 align-items-center w-100">
+                                        <div class="col-md-3 col-6">
+                                            <span class="fw-bold text-primary fs-5">#Đơn {{ order.id }}</span>
+                                            <div class="small text-muted">{{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                                        </div>
+                                        <div class="col-md-3 col-6 text-md-center">
+                                            <span class="badge bg-{{ order.status_badge_class }} px-3 py-2">
+                                                {{ order.status_label }}
+                                            </span>
+                                        </div>
+                                        <div class="col-md-3 col-6">
+                                            <small class="text-muted d-block">Người nhận:</small>
+                                            <span class="fw-semibold text-truncate d-block">{{ order.recipient_name }} ({{ order.phone }})</span>
+                                        </div>
+                                        <div class="col-md-3 col-6 text-end">
+                                            <small class="text-muted d-block">Tổng tiền:</small>
+                                            <span class="fw-bold text-danger fs-5">{{ "{:,.0f}".format(order.total_amount) }} VNĐ</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse-{{ order.id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" data-bs-parent="#ordersAccordion">
+                            <div class="accordion-body p-4 bg-white">
+                                <!-- Tiến trình đơn hàng trực quan -->
+                                <div class="p-3 bg-light rounded-3 mb-4">
+                                    <h6 class="fw-bold mb-3 text-secondary"><i class="bi bi-truck me-2"></i>Trạng Thái Tiến Trình</h6>
+                                    <div class="d-flex justify-content-between position-relative">
+                                        <div class="text-center position-relative z-1">
+                                            <div class="rounded-circle bg-success text-white d-inline-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                                                <i class="bi bi-check-lg"></i>
+                                            </div>
+                                            <div class="small fw-semibold mt-1">Đã Đặt Hàng</div>
+                                        </div>
+                                        <div class="text-center position-relative z-1">
+                                            <div class="rounded-circle {% if order.status in ['completed', 'pending'] %}bg-primary text-white{% else %}bg-secondary text-white opacity-50{% endif %} d-inline-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                                                <i class="bi bi-box-seam"></i>
+                                            </div>
+                                            <div class="small fw-semibold mt-1">Đang Xử Lý</div>
+                                        </div>
+                                        <div class="text-center position-relative z-1">
+                                            <div class="rounded-circle {% if order.status == 'completed' %}bg-success text-white{% elif order.status == 'cancelled' %}bg-danger text-white{% else %}bg-secondary text-white opacity-50{% endif %} d-inline-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                                                <i class="bi {% if order.status == 'cancelled' %}bi-x-lg{% else %}bi-check2-all{% endif %}"></i>
+                                            </div>
+                                            <div class="small fw-semibold mt-1">
+                                                {% if order.status == 'cancelled' %}Đã Hủy{% else %}Hoàn Thành{% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Thông tin giao hàng -->
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <h6 class="fw-bold text-dark mb-2"><i class="bi bi-geo-alt text-primary me-2"></i>Địa Chỉ Nhận Hàng</h6>
+                                            <p class="mb-1"><strong>Người nhận:</strong> {{ order.recipient_name }}</p>
+                                            <p class="mb-1"><strong>Số điện thoại:</strong> {{ order.phone }}</p>
+                                            <p class="mb-0"><strong>Địa chỉ:</strong> {{ order.address }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle text-primary me-2"></i>Thông Tin Bổ Sung</h6>
+                                            <p class="mb-1"><strong>Mã đơn hàng:</strong> #{{ order.id }}</p>
+                                            <p class="mb-1"><strong>Thời gian đặt:</strong> {{ order.created_at.strftime('%H:%M - %d/%m/%Y') }}</p>
+                                            <p class="mb-0"><strong>Tài khoản đặt:</strong> 
+                                                {% if order.customer %}
+                                                    <span class="badge bg-info text-dark">{{ order.customer.username }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Khách vãng lai</span>
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Danh sách sản phẩm trong đơn -->
+                                <h6 class="fw-bold mb-3"><i class="bi bi-bag-check text-primary me-2"></i>Sản Phẩm Trong Đơn</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Sản phẩm</th>
+                                                <th class="text-center" style="width: 100px;">Số lượng</th>
+                                                <th class="text-end" style="width: 150px;">Đơn giá</th>
+                                                <th class="text-end" style="width: 160px;">Thành tiền</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in order.items.all() %}
+                                            <tr>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        {% if item.product and item.product.image_url %}
+                                                        <img src="{{ item.product.image_url }}" 
+                                                             onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500';"
+                                                             alt="{{ item.product.name }}" 
+                                                             class="rounded me-2" 
+                                                             style="width: 42px; height: 42px; object-fit: contain;">
+                                                        {% endif %}
+                                                        <div>
+                                                            {% if item.product %}
+                                                                <a href="{{ url_for('main.product_detail', product_id=item.product.id) }}" class="fw-bold text-decoration-none text-dark">
+                                                                    {{ item.product.name }}
+                                                                </a>
+                                                            {% else %}
+                                                                <span class="fw-bold text-dark">Sản phẩm #{{ item.product_id }}</span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="text-center fw-semibold">{{ item.quantity }}</td>
+                                                <td class="text-end">{{ "{:,.0f}".format(item.unit_price) }} VNĐ</td>
+                                                <td class="text-end fw-bold text-danger">{{ "{:,.0f}".format(item.subtotal) }} VNĐ</td>
+                                            </tr>
+                                            {% endfor %}
+                                            <tr>
+                                                <td colspan="3" class="text-end fw-bold fs-6">Tổng cộng thanh toán:</td>
+                                                <td class="text-end fw-bold text-danger fs-5">{{ "{:,.0f}".format(order.total_amount) }} VNĐ</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            {% elif searched %}
+                <!-- Không tìm thấy kết quả -->
+                <div class="text-center py-5 bg-white rounded-3 shadow-sm border p-4">
+                    <i class="bi bi-search text-muted display-4 mb-3 d-block"></i>
+                    <h5 class="fw-bold text-danger">Không tìm thấy đơn hàng phù hợp!</h5>
+                    <p class="text-muted mb-3">
+                        Không có đơn hàng nào khớp với từ khóa <strong>"{{ search_query }}"</strong>.<br>
+                        Vui lòng kiểm tra lại chính xác <strong>Số điện thoại</strong> hoặc <strong>Mã đơn hàng</strong> đã điền khi đặt hàng.
+                    </p>
+                    <a href="{{ url_for('cart.order_tracking') }}" class="btn btn-outline-primary px-4 fw-semibold">
+                        <i class="bi bi-arrow-repeat me-1"></i>Thử lại
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

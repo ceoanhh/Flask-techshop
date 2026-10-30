@@ -1,8 +1,10 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify
-from flask_login import current_user
+import re
+from flask import render_template, redirect, url_for, flash, request, jsonify, session
+from flask_login import current_user, login_user
 from app.cart import bp
 from app.cart.cart_service import CartService
-from app.models import Order
+from app.models import Order, User
+from app.extensions import db
 
 # ==========================================
 # MODULE CART & CHECKOUT - PHỤ TRÁCH: ÁNH
@@ -19,13 +21,53 @@ def _is_ajax():
 @bp.route('/')
 def view_cart():
     """Trang xem chi tiết giỏ hàng và danh sách sản phẩm đã chọn."""
-    cart_items, total_price, total_quantity = CartService.get_cart_items()
+    cart_items_all, all_total_price, all_total_quantity = CartService.get_cart_items()
+    
+    current_pids = [item['product'].id for item in cart_items_all]
+    selected_pids = session.get('selected_cart_pids')
+
+    if selected_pids is None:
+        # Lần đầu vào giỏ: mặc định chọn tất cả sản phẩm
+        selected_pids = current_pids
+    else:
+        # Giữ nguyên các sản phẩm đã chọn trước đó mà vẫn còn tồn tại trong giỏ
+        selected_pids = [pid for pid in selected_pids if pid in current_pids]
+
+    session['selected_cart_pids'] = selected_pids
+    session.modified = True
+
+    # Tính tổng tiền và tổng số lượng theo đúng các sản phẩm đang được chọn
+    _, selected_total_price, selected_total_quantity = CartService.get_cart_items(selected_ids=selected_pids)
+
     return render_template(
         'cart.html',
-        cart_items=cart_items,
-        total_price=total_price,
-        total_quantity=total_quantity
+        cart_items=cart_items_all,
+        selected_pids=selected_pids,
+        total_price=selected_total_price,
+        total_quantity=selected_total_quantity,
+        cart_total_quantity=all_total_quantity
     )
+
+@bp.route('/save-selection', methods=['POST'])
+def save_selection():
+    """Lưu danh sách ID sản phẩm được tích chọn vào session để giữ nguyên khi thoát ra xem hàng."""
+    if request.is_json:
+        data = request.get_json() or {}
+        selected = data.get('selected', [])
+    else:
+        raw = request.form.get('selected', '')
+        selected = [x.strip() for x in raw.split(',') if x.strip().isdigit()]
+
+    selected_ids = []
+    for x in selected:
+        try:
+            selected_ids.append(int(x))
+        except (ValueError, TypeError):
+            continue
+
+    session['selected_cart_pids'] = selected_ids
+    session.modified = True
+    return jsonify({'success': True, 'selected_ids': selected_ids})
 
 @bp.route('/add/<int:product_id>', methods=['POST'])
 def add_to_cart(product_id):
@@ -37,6 +79,15 @@ def add_to_cart(product_id):
         quantity = request.form.get('quantity', 1)
 
     success, message = CartService.add_to_cart(product_id, quantity)
+
+    if success:
+        # Khi thêm sản phẩm mới vào giỏ, nếu session đã lưu danh sách chọn trước đó,
+        # tự động thêm sản phẩm mới này vào danh sách chọn mà vẫn bảo toàn các lựa chọn cũ
+        selected_pids = session.get('selected_cart_pids')
+        if selected_pids is not None and product_id not in selected_pids:
+            selected_pids.append(product_id)
+            session['selected_cart_pids'] = selected_pids
+            session.modified = True
 
     if _is_ajax():
         cart_items, total_price, total_quantity = CartService.get_cart_items()
@@ -91,6 +142,13 @@ def remove_from_cart(product_id):
     """Xóa một sản phẩm khỏi giỏ hàng."""
     success, message = CartService.remove_from_cart(product_id)
 
+    if success and 'selected_cart_pids' in session:
+        selected_pids = session.get('selected_cart_pids', [])
+        if product_id in selected_pids:
+            selected_pids.remove(product_id)
+            session['selected_cart_pids'] = selected_pids
+            session.modified = True
+
     if _is_ajax():
         cart_items, total_price, total_quantity = CartService.get_cart_items()
         return jsonify({
@@ -109,6 +167,7 @@ def remove_from_cart(product_id):
 def clear_cart():
     """Làm trống toàn bộ giỏ hàng."""
     CartService.clear_cart()
+    session.pop('selected_cart_pids', None)
 
     if _is_ajax():
         return jsonify({
@@ -124,16 +183,31 @@ def clear_cart():
 
 @bp.route('/checkout', methods=['GET', 'POST'])
 def checkout():
-    """Xử lý quá trình đặt hàng và trừ tồn kho."""
-    cart_items, total_price, total_quantity = CartService.get_cart_items()
+    """Xử lý quá trình đặt hàng và trừ tồn kho (Bắt buộc đăng nhập, chỉ mua các sản phẩm được chọn)."""
+    selected_raw = request.args.get('selected') or request.form.get('selected')
+    if not current_user.is_authenticated:
+        flash('Vui lòng đăng nhập tài khoản để tiến hành đặt hàng!', 'info')
+        next_url = url_for('cart.checkout', selected=selected_raw) if selected_raw else url_for('cart.checkout')
+        return redirect(url_for('auth.login', next=next_url))
+
+    selected_ids = None
+    if selected_raw:
+        try:
+            selected_ids = [int(x.strip()) for x in selected_raw.split(',') if x.strip().isdigit()]
+        except (ValueError, TypeError):
+            selected_ids = None
+    elif 'selected_cart_pids' in session:
+        selected_ids = session.get('selected_cart_pids')
+
+    cart_items, total_price, total_quantity = CartService.get_cart_items(selected_ids=selected_ids)
 
     if not cart_items:
-        flash('Giỏ hàng của bạn đang trống! Vui lòng chọn sản phẩm trước khi thanh toán.', 'warning')
+        flash('Không có sản phẩm nào được chọn để thanh toán! Vui lòng chọn sản phẩm trong giỏ hàng.', 'warning')
         return redirect(url_for('cart.view_cart'))
 
     if request.method == 'POST':
         recipient_name = request.form.get('recipient_name', '').strip()
-        phone = request.form.get('phone', '').strip()
+        phone = request.form.get('phone', '').strip().replace(' ', '').replace('.', '').replace('-', '')
         address = request.form.get('address', '').strip()
 
         # Kiểm tra tính hợp lệ của dữ liệu đầu vào
@@ -143,16 +217,19 @@ def checkout():
                 'checkout.html',
                 cart_items=cart_items,
                 total_price=total_price,
-                total_quantity=total_quantity
+                total_quantity=total_quantity,
+                selected_raw=selected_raw
             )
 
-        if len(phone) < 9 or not phone.replace('+', '').replace(' ', '').isdigit():
-            flash('Số điện thoại không hợp lệ, vui lòng kiểm tra lại!', 'danger')
+        VIETNAM_PHONE_REGEX = r'^(0|\+84)(3[2-9]|5[2689]|7[06-9]|8[1-9]|9[0-9])[0-9]{7}$'
+        if not re.match(VIETNAM_PHONE_REGEX, phone):
+            flash('Số điện thoại không đúng chuẩn 10 chữ số nhà mạng Việt Nam (đầu 03, 05, 07, 08, 09)!', 'danger')
             return render_template(
                 'checkout.html',
                 cart_items=cart_items,
                 total_price=total_price,
-                total_quantity=total_quantity
+                total_quantity=total_quantity,
+                selected_raw=selected_raw
             )
 
         user_id = current_user.id if current_user.is_authenticated else None
@@ -160,7 +237,8 @@ def checkout():
             recipient_name=recipient_name,
             phone=phone,
             address=address,
-            user_id=user_id
+            user_id=user_id,
+            selected_ids=selected_ids
         )
 
         if error:
@@ -169,17 +247,25 @@ def checkout():
                 'checkout.html',
                 cart_items=cart_items,
                 total_price=total_price,
-                total_quantity=total_quantity
+                total_quantity=total_quantity,
+                selected_raw=selected_raw
             )
 
         flash(f'Đặt hàng thành công! Mã đơn hàng của bạn là #{order.id}.', 'success')
+        # Dọn dẹp các sản phẩm đã mua khỏi danh sách chọn trong session
+        if 'selected_cart_pids' in session:
+            current_selected = session.get('selected_cart_pids', [])
+            purchased_pids = [item['product'].id for item in cart_items]
+            session['selected_cart_pids'] = [pid for pid in current_selected if pid not in purchased_pids]
+            session.modified = True
         return redirect(url_for('cart.order_success', order_id=order.id))
 
     return render_template(
         'checkout.html',
         cart_items=cart_items,
         total_price=total_price,
-        total_quantity=total_quantity
+        total_quantity=total_quantity,
+        selected_raw=selected_raw
     )
 
 @bp.route('/success/<int:order_id>')
@@ -187,3 +273,86 @@ def order_success(order_id):
     """Trang thông báo đặt hàng thành công và chi tiết đơn hàng."""
     order = Order.query.get_or_404(order_id)
     return render_template('order_success.html', order=order)
+
+@bp.route('/tracking')
+def order_tracking():
+    """Tra cứu đơn hàng và xem lịch sử mua hàng qua Số điện thoại hoặc Mã đơn hàng."""
+    search_query = request.args.get('q', '').strip()
+    orders = []
+    searched = bool(search_query)
+
+    if search_query:
+        clean_q = search_query.replace(' ', '').replace('.', '').replace('-', '')
+        found = []
+
+        # 1. Tìm chính xác theo mã đơn nếu là số ngắn
+        if clean_q.isdigit() and len(clean_q) <= 6:
+            single_order = db.session.get(Order, int(clean_q))
+            if single_order:
+                found.append(single_order)
+
+        # 2. Tìm theo số điện thoại (chứa hoặc bằng số điện thoại nhập vào)
+        phone_matches = Order.query.filter(Order.phone.ilike(f'%{clean_q}%')).order_by(Order.created_at.desc()).all()
+        for o in phone_matches:
+            if o not in found:
+                found.append(o)
+
+        orders = found
+    elif current_user.is_authenticated:
+        # Nếu đã đăng nhập và chưa tìm kiếm gì -> Tự động hiển thị toàn bộ lịch sử đơn hàng của tài khoản
+        orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
+
+    return render_template(
+        'order_tracking.html',
+        orders=orders,
+        search_query=search_query,
+        searched=searched
+    )
+
+@bp.route('/claim-account/<int:order_id>', methods=['POST'])
+def claim_account(order_id):
+    """Cơ chế liên kết tài khoản sau khi mua hàng (Claim Account)."""
+    if current_user.is_authenticated:
+        flash('Bạn hiện đã đăng nhập tài khoản rồi.', 'info')
+        return redirect(url_for('cart.order_tracking'))
+
+    order = Order.query.get_or_404(order_id)
+    username = request.form.get('username', '').strip()
+    email = request.form.get('email', '').strip()
+    password = request.form.get('password', '')
+    confirm_password = request.form.get('confirm_password', '')
+
+    if not username or not email or not password:
+        flash('Vui lòng điền đầy đủ Tên tài khoản, Email và Mật khẩu!', 'danger')
+        return redirect(url_for('cart.order_success', order_id=order.id))
+
+    if len(password) < 6:
+        flash('Mật khẩu bảo mật phải có ít nhất 6 ký tự!', 'warning')
+        return redirect(url_for('cart.order_success', order_id=order.id))
+
+    if password != confirm_password:
+        flash('Mật khẩu xác nhận không trùng khớp!', 'danger')
+        return redirect(url_for('cart.order_success', order_id=order.id))
+
+    # Kiểm tra xem username hoặc email đã tồn tại chưa
+    if User.query.filter((User.username == username) | (User.email == email)).first():
+        flash('Tên người dùng hoặc Email này đã tồn tại, vui lòng chọn tên/email khác!', 'danger')
+        return redirect(url_for('cart.order_success', order_id=order.id))
+
+    # Tạo User mới
+    new_user = User(username=username, email=email, role='customer')
+    new_user.set_password(password)
+    db.session.add(new_user)
+    db.session.flush()
+
+    # Tự động liên kết TẤT CẢ các đơn hàng của số điện thoại này vào tài khoản mới
+    linked_orders = Order.query.filter_by(phone=order.phone, user_id=None).all()
+    for o in linked_orders:
+        o.user_id = new_user.id
+
+    db.session.commit()
+
+    # Đăng nhập luôn cho khách hàng
+    login_user(new_user)
+    flash(f'Tạo tài khoản thành công! Đã tự động lưu trữ và liên kết {len(linked_orders)} đơn hàng thuộc số điện thoại {order.phone} vào tài khoản của bạn.', 'success')
+    return redirect(url_for('cart.order_tracking'))

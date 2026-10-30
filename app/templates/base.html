@@ -26,6 +26,12 @@
                 <button class="btn btn-outline-light" type="submit"><i class="bi bi-search"></i></button>
             </form>
             <ul class="navbar-nav ms-auto align-items-center">
+                <!-- Nút Tra cứu đơn hàng đặt bên trái mục Đăng nhập / Đăng ký -->
+                <li class="nav-item me-1">
+                    <a class="nav-link" href="{{ url_for('cart.order_tracking') }}">
+                        <i class="bi bi-clock-history me-1"></i>Tra cứu đơn
+                    </a>
+                </li>
                 {% if current_user.is_authenticated %}
                     <li class="nav-item">
                         <span class="nav-link text-light me-2">Chào, <strong>{{ current_user.username }}</strong></span>

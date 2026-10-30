@@ -11,47 +11,48 @@
         <a href="#product-section" class="btn btn-warning btn-lg fw-bold text-dark px-4 shadow">Mua Sắm Ngay</a>
     </div>
 
-    <!-- KHỐI THÔNG BÁO KẾT QUẢ TÌM KIẾM (Nếu người dùng vừa Search) -->
-    {% if search_query %}
-    <div class="alert alert-info d-flex justify-content-between align-items-center mb-4 shadow-sm rounded-3">
-        <div>
-            <i class="bi bi-search me-2 fs-5"></i>
-            <span>Kết quả tìm kiếm cho từ khóa: <strong class="text-primary">"{{ search_query }}"</strong> (Tìm thấy <strong>{{ products|length }}</strong> sản phẩm)</span>
+    <div id="product-ajax-wrapper">
+        <!-- KHỐI THÔNG BÁO KẾT QUẢ TÌM KIẾM (Nếu người dùng vừa Search) -->
+        {% if search_query %}
+        <div class="alert alert-info d-flex justify-content-between align-items-center mb-4 shadow-sm rounded-3">
+            <div>
+                <i class="bi bi-search me-2 fs-5"></i>
+                <span>Kết quả tìm kiếm cho từ khóa: <strong class="text-primary">"{{ search_query }}"</strong> (Tìm thấy <strong>{{ products|length }}</strong> sản phẩm)</span>
+            </div>
+            <a href="{{ url_for('main.index') }}" class="btn btn-sm btn-outline-danger fw-semibold category-filter-btn">
+                <i class="bi bi-x-circle me-1"></i>Xóa tìm kiếm
+            </a>
         </div>
-        <a href="{{ url_for('main.index') }}" class="btn btn-sm btn-outline-danger fw-semibold">
-            <i class="bi bi-x-circle me-1"></i>Xóa tìm kiếm
-        </a>
-    </div>
-    {% endif %}
-
-    <!-- Thanh Nút Lọc Danh Mục -->
-    <div id="product-section" class="d-flex justify-content-center flex-wrap gap-2 mb-4">
-        <a href="{{ url_for('main.index') }}" 
-           class="btn {% if not current_category %}btn-primary{% else %}btn-outline-primary{% endif %} rounded-pill px-4 fw-semibold shadow-sm">
-           <i class="bi bi-grid-fill me-1"></i> Tất cả sản phẩm
-        </a>
-        
-        {% if categories %}
-            {% for cat in categories %}
-                <a href="{{ url_for('main.index', category=cat.slug, q=search_query) }}" 
-                   class="btn {% if current_category == cat.slug %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3 shadow-sm">
-                   {{ cat.name }}
-                </a>
-            {% endfor %}
-        {% else %}
-            <!-- Nút danh mục mặc định nếu chưa truyền categories -->
-            <a href="?category=dien-thoai{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3">📱 Điện thoại</a>
-            <a href="?category=laptop{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3">💻 Laptop</a>
-            <a href="?category=tai-nghe{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3">🎧 Tai nghe</a>
-            <a href="?category=phu-kien{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3">⌨️ Phụ kiện</a>
-            <a href="?category=dong-ho-thong-minh{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3">⌚ Đồng hồ</a>
         {% endif %}
-    </div>
 
-    <h4 class="fw-bold mb-4 text-dark"><i class="bi bi-cpu-fill text-primary me-2"></i>Sản Phẩm Nổi Bật</h4>
+        <!-- Thanh Nút Lọc Danh Mục -->
+        <div id="product-section" class="d-flex justify-content-center flex-wrap gap-2 mb-4">
+            <a href="{{ url_for('main.index') }}" 
+               class="btn {% if not current_category %}btn-primary{% else %}btn-outline-primary{% endif %} rounded-pill px-4 fw-semibold shadow-sm category-filter-btn">
+               <i class="bi bi-grid-fill me-1"></i> Tất cả sản phẩm
+            </a>
+            
+            {% if categories %}
+                {% for cat in categories %}
+                    <a href="{{ url_for('main.index', category=cat.slug, q=search_query) }}" 
+                       class="btn {% if current_category == cat.slug %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3 shadow-sm category-filter-btn">
+                       {{ cat.name }}
+                    </a>
+                {% endfor %}
+            {% else %}
+                <!-- Nút danh mục mặc định nếu chưa truyền categories -->
+                <a href="?category=dien-thoai{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3 category-filter-btn">📱 Điện thoại</a>
+                <a href="?category=laptop{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3 category-filter-btn">💻 Laptop</a>
+                <a href="?category=tai-nghe{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3 category-filter-btn">🎧 Tai nghe</a>
+                <a href="?category=phu-kien{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3 category-filter-btn">⌨️ Phụ kiện</a>
+                <a href="?category=dong-ho-thong-minh{% if search_query %}&q={{ search_query }}{% endif %}" class="btn btn-outline-secondary rounded-pill px-3 category-filter-btn">⌚ Đồng hồ</a>
+            {% endif %}
+        </div>
 
-    <!-- Danh Sách Sản Phẩm -->
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+        <h4 class="fw-bold mb-4 text-dark"><i class="bi bi-cpu-fill text-primary me-2"></i>Sản Phẩm Nổi Bật</h4>
+
+        <!-- Danh Sách Sản Phẩm -->
+        <div id="product-list-container" class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4 position-relative" style="transition: opacity 0.2s ease;">
         {% for product in products %}
         <div class="col">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden product-card position-relative">
@@ -100,6 +101,7 @@
             </a>
         </div>
         {% endfor %}
+    </div>
     </div>
 </div>
 

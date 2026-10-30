@@ -12,10 +12,10 @@ class CartService:
         return session['cart']
 
     @classmethod
-    def get_cart_items(cls):
+    def get_cart_items(cls, selected_ids=None):
         """
         Lấy danh sách các sản phẩm trong giỏ hàng kèm thông tin chi tiết.
-        Sử dụng batch query để tối ưu hiệu năng (tránh N+1 query).
+        Hỗ trợ lọc theo selected_ids (danh sách ID sản phẩm được tích chọn để mua).
         """
         cart = cls.get_raw_cart()
         if not cart:
@@ -57,9 +57,14 @@ class CartService:
                 qty = 1
 
             item_total = product.price * qty
+            cleaned_cart[str(pid)] = qty
+
+            # Nếu có bộ lọc selected_ids, chỉ đưa vào items thanh toán các món được chọn
+            if selected_ids is not None and pid not in selected_ids:
+                continue
+
             total_price += item_total
             total_quantity += qty
-            cleaned_cart[str(pid)] = qty
 
             items.append({
                 'product': product,
@@ -153,20 +158,20 @@ class CartService:
         return True, "Đã làm trống giỏ hàng."
 
     @classmethod
-    def checkout(cls, recipient_name, phone, address, user_id=None):
+    def checkout(cls, recipient_name, phone, address, user_id=None, selected_ids=None):
         """
         Thực hiện giao dịch thanh toán đặt hàng:
-        - Kiểm tra tính hợp lệ của giỏ hàng
+        - Kiểm tra tính hợp lệ của giỏ hàng (hoặc các sản phẩm được tích chọn)
         - Kiểm tra số lượng tồn kho trước khi tạo đơn
         - Trừ tồn kho và lưu Order + OrderItem vào DB bằng transaction
-        - Xóa giỏ hàng sau khi thành công
+        - Xóa chỉ các sản phẩm đã mua khỏi giỏ hàng, giữ lại những sản phẩm chưa mua
         """
-        items, total_price, _ = cls.get_cart_items()
+        items, total_price, _ = cls.get_cart_items(selected_ids=selected_ids)
 
         if not items:
-            return None, "Giỏ hàng của bạn đang trống, không thể thanh toán!"
+            return None, "Không có sản phẩm nào được chọn để thanh toán!"
 
-        # Kiểm tra tồn kho toàn bộ giỏ hàng
+        # Kiểm tra tồn kho toàn bộ các sản phẩm đã chọn
         for item in items:
             prod = item['product']
             qty = item['quantity']
@@ -185,9 +190,11 @@ class CartService:
             db.session.add(order)
             db.session.flush()  # Để lấy order.id
 
+            purchased_pids = []
             for item in items:
                 prod = item['product']
                 qty = item['quantity']
+                purchased_pids.append(prod.id)
                 
                 # Trừ tồn kho
                 prod.stock_quantity -= qty
@@ -203,8 +210,13 @@ class CartService:
 
             db.session.commit()
 
-            # Dọn dẹp giỏ hàng
-            cls.clear_cart()
+            # Dọn dẹp chỉ những sản phẩm đã mua ra khỏi giỏ hàng
+            cart = cls.get_raw_cart()
+            for pid in purchased_pids:
+                cart.pop(str(pid), None)
+            session['cart'] = cart
+            session.modified = True
+
             return order, None
 
         except Exception as e:

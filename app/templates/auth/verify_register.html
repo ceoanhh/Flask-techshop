@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Xác Thực Số Điện Thoại - TechShop{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow border-0 rounded-3">
+            <div class="card-body p-4">
+                <h3 class="card-title text-center mb-1 text-primary fw-bold">Xác Thực Số Điện Thoại</h3>
+                <p class="text-center text-muted small mb-3">
+                    Mã OTP 6 số đã được tự động gửi đến: <strong class="text-dark">{{ phone }}</strong>
+                </p>
+
+                <!-- Box mô phỏng SMS OTP gửi đến điện thoại (Demo) -->
+                <div class="alert alert-light border border-primary text-center p-3 mb-4 shadow-sm rounded-3">
+                    <div class="small text-muted mb-1"><i class="bi bi-phone text-primary me-1"></i>[Mô phỏng tin nhắn SMS đến điện thoại]:</div>
+                    <div class="fs-4 fw-bold text-primary letter-spacing" id="otpDisplay">{{ otp_demo or '123456' }}</div>
+                    <div class="small text-muted mt-1">Mã xác thực có hiệu lực trong vòng 3 phút.</div>
+                </div>
+
+                <form action="{{ url_for('auth.verify_register') }}" method="POST">
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold text-center d-block">Nhập mã xác thực OTP <span class="text-danger">*</span></label>
+                        <input type="text" 
+                               name="otp" 
+                               id="otpInput" 
+                               class="form-control form-control-lg text-center fs-3 fw-bold letter-spacing" 
+                               placeholder="------" 
+                               maxlength="6" 
+                               required 
+                               autofocus>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 fw-bold py-2 shadow-sm mb-3">
+                        <i class="bi bi-check-circle-fill me-1"></i>Xác Nhận & Kích Hoạt Tài Khoản
+                    </button>
+                </form>
+
+                <div class="text-center d-flex justify-content-between align-items-center pt-3 border-top">
+                    <a href="{{ url_for('auth.register') }}" class="text-decoration-none small text-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>Quay lại sửa thông tin
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnResendRegisterOtp">
+                        <i class="bi bi-arrow-repeat me-1"></i>Gửi lại mã OTP
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const btnResend = document.getElementById('btnResendRegisterOtp');
+    const otpDisplay = document.getElementById('otpDisplay');
+    const otpInput = document.getElementById('otpInput');
+
+    let countdown = 60;
+    btnResend.disabled = true;
+    btnResend.innerHTML = `Gửi lại (${countdown}s)`;
+    const timer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+            clearInterval(timer);
+            btnResend.disabled = false;
+            btnResend.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Gửi lại mã OTP';
+        } else {
+            btnResend.innerHTML = `Gửi lại (${countdown}s)`;
+        }
+    }, 1000);
+
+    btnResend.addEventListener('click', function () {
+        btnResend.disabled = true;
+        btnResend.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang gửi...';
+
+        fetch("{{ url_for('auth.resend_register_otp') }}", {
+            method: 'POST'
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                if (window.showToast) {
+                    window.showToast(`📱 [Mô phỏng SMS]: Mã OTP mới là: ${data.otp_demo}`, 'info');
+                }
+                otpDisplay.textContent = data.otp_demo;
+                otpInput.value = '';
+                otpInput.focus();
+
+                countdown = 60;
+                btnResend.innerHTML = `Gửi lại (${countdown}s)`;
+                const newTimer = setInterval(() => {
+                    countdown--;
+                    if (countdown <= 0) {
+                        clearInterval(newTimer);
+                        btnResend.disabled = false;
+                        btnResend.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Gửi lại mã OTP';
+                    } else {
+                        btnResend.innerHTML = `Gửi lại (${countdown}s)`;
+                    }
+                }, 1000);
+            } else {
+                alert(data.message || 'Không thể gửi lại mã OTP!');
+                btnResend.disabled = false;
+                btnResend.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Gửi lại mã OTP';
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi gửi lại OTP:', err);
+            btnResend.disabled = false;
+            btnResend.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Gửi lại mã OTP';
+        });
+    });
+});
+</script>
+{% endblock %}
