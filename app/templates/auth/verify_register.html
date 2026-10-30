@@ -7,16 +7,9 @@
         <div class="card shadow border-0 rounded-3">
             <div class="card-body p-4">
                 <h3 class="card-title text-center mb-1 text-primary fw-bold">Xác Thực Số Điện Thoại</h3>
-                <p class="text-center text-muted small mb-3">
-                    Mã OTP 6 số đã được tự động gửi đến: <strong class="text-dark">{{ phone }}</strong>
+                <p class="text-center text-muted small mb-4">
+                    Mã OTP 6 số đã được gửi đến: <strong class="text-dark">{{ phone }}</strong>
                 </p>
-
-                <!-- Box mô phỏng SMS OTP gửi đến điện thoại (Demo) -->
-                <div class="alert alert-light border border-primary text-center p-3 mb-4 shadow-sm rounded-3">
-                    <div class="small text-muted mb-1"><i class="bi bi-phone text-primary me-1"></i>[Mô phỏng tin nhắn SMS đến điện thoại]:</div>
-                    <div class="fs-4 fw-bold text-primary letter-spacing" id="otpDisplay">{{ otp_demo or '123456' }}</div>
-                    <div class="small text-muted mt-1">Mã xác thực có hiệu lực trong vòng 3 phút.</div>
-                </div>
 
                 <form action="{{ url_for('auth.verify_register') }}" method="POST">
                     <div class="mb-4">
@@ -52,7 +45,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const btnResend = document.getElementById('btnResendRegisterOtp');
-    const otpDisplay = document.getElementById('otpDisplay');
     const otpInput = document.getElementById('otpInput');
 
     let countdown = 60;
@@ -79,10 +71,6 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                if (window.showToast) {
-                    window.showToast(`📱 [Mô phỏng SMS]: Mã OTP mới là: ${data.otp_demo}`, 'info');
-                }
-                otpDisplay.textContent = data.otp_demo;
                 otpInput.value = '';
                 otpInput.focus();
 

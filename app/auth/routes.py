@@ -76,9 +76,19 @@ def register():
         }
         session['register_otp'] = otp_code
         session['register_expiry'] = time.time() + 180  # Hạn 3 phút
-        session['otp_demo'] = otp_code
+        session.pop('otp_demo', None)
 
-        flash(f'Mã xác thực OTP đã được tự động gửi đến số điện thoại {phone}. Vui lòng nhập mã để hoàn tất đăng ký!', 'info')
+        # GỬI MÃ OTP VÀO TERMINAL MÁY CHỦ THAY VÌ HIỂN THỊ TRÊN WEB
+        print("\n" + "=" * 60)
+        print("🔒 [TECHSHOP SECURITY] MÃ XÁC THỰC OTP ĐĂNG KÝ TÀI KHOẢN")
+        print(f"👉 Người dùng   : {username}")
+        print(f"📞 Số điện thoại: {phone}")
+        print(f"📧 Email         : {email}")
+        print(f"🔑 MÃ OTP       : >>> {otp_code} <<<")
+        print("⏰ Hiệu lực     : 3 phút (180 giây)")
+        print("=" * 60 + "\n", flush=True)
+
+        flash(f'Mã xác thực OTP đã được gửi đến số điện thoại {phone}. Vui lòng nhập mã để hoàn tất đăng ký!', 'info')
         return redirect(url_for('auth.verify_register'))
 
     return render_template('auth/register.html', next=next_page)
@@ -103,7 +113,7 @@ def verify_register():
 
         if otp != stored_otp or time.time() > stored_expiry:
             flash('Mã OTP không chính xác hoặc đã hết hạn (3 phút)! Vui lòng bấm gửi lại mã OTP.', 'danger')
-            return render_template('auth/verify_register.html', phone=pending['phone'], otp_demo=session.get('otp_demo'))
+            return render_template('auth/verify_register.html', phone=pending['phone'])
 
         # Khởi tạo User mới sau khi đã xác thực SĐT thành công 100%
         new_user = User(
@@ -136,7 +146,7 @@ def verify_register():
             return redirect(next_page)
         return redirect(url_for('main.index'))
 
-    return render_template('auth/verify_register.html', phone=pending['phone'], otp_demo=session.get('otp_demo'))
+    return render_template('auth/verify_register.html', phone=pending['phone'])
 
 
 @bp.route('/api/resend-register-otp', methods=['POST'])
@@ -149,12 +159,20 @@ def resend_register_otp():
     new_otp = str(random.randint(100000, 999999))
     session['register_otp'] = new_otp
     session['register_expiry'] = time.time() + 180
-    session['otp_demo'] = new_otp
+    session.pop('otp_demo', None)
+
+    # GỬI MÃ OTP MỚI VÀO TERMINAL MÁY CHỦ
+    print("\n" + "=" * 60)
+    print("🔒 [TECHSHOP SECURITY] GỬI LẠI MÃ OTP ĐĂNG KÝ TÀI KHOẢN")
+    print(f"👉 Người dùng   : {pending['username']}")
+    print(f"📞 Số điện thoại: {pending['phone']}")
+    print(f"🔑 MÃ OTP MỚI   : >>> {new_otp} <<<")
+    print("⏰ Hiệu lực     : 3 phút (180 giây)")
+    print("=" * 60 + "\n", flush=True)
 
     return jsonify({
         'success': True,
         'message': f'Đã gửi lại mã OTP đến {pending["phone"]}!',
-        'otp_demo': new_otp,
         'target': pending['phone']
     })
 
