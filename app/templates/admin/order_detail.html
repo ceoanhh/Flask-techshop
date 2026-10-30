@@ -44,6 +44,20 @@
                             {% endif %}
                         </td>
                     </tr>
+                    <tr>
+                        <th class="text-muted">Hình thức TT:</th>
+                        <td>
+                            <strong>{{ order.payment_method_label }}</strong>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Trạng thái TT:</th>
+                        <td>
+                            <span class="badge bg-{{ order.payment_status_badge_class }} px-2 py-1">
+                                {{ order.payment_status_label }}
+                            </span>
+                        </td>
+                    </tr>
                 </table>
             </div>
         </div>
@@ -63,6 +77,59 @@
                             {{ order.status_label }}
                         </span>
                     </div>
+
+                    {% if order.payment_method == 'qr_code' %}
+                    <div class="p-3 mb-3 border rounded bg-white">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold text-primary"><i class="bi bi-qr-code me-1"></i>Thanh toán Chuyển khoản QR:</span>
+                            <span class="badge bg-{{ order.payment_status_badge_class }}">{{ order.payment_status_label }}</span>
+                        </div>
+                        <div class="small text-muted mb-2">
+                            MBBank - STK: <strong>0366760056</strong> | Số tiền: <strong class="text-danger">{{ "{:,.0f}".format(order.total_amount) }} đ</strong> | Nội dung: <strong>TECHSHOP {{ order.id }}</strong>
+                        </div>
+                        {% if order.status != 'cancelled' %}
+                            {% if order.payment_status == 'awaiting_confirmation' %}
+                            <div class="alert alert-warning p-2 small mb-2 d-flex align-items-center">
+                                <i class="bi bi-bell-fill fs-5 text-warning me-2"></i>
+                                <div>
+                                    <strong>Khách hàng thông báo đã chuyển khoản thành công!</strong><br>
+                                    Vui lòng kiểm tra biến động số dư tài khoản ngân hàng MBBank <strong>0366760056</strong>.
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <form action="{{ url_for('admin.confirm_order_payment', order_id=order.id) }}" method="POST" class="flex-grow-1">
+                                    <button type="submit" class="btn btn-sm btn-success fw-bold w-100">
+                                        <i class="bi bi-check-circle-fill me-1"></i> Đã Nhận Tiền (Duyệt TT)
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-sm btn-danger fw-bold" data-bs-toggle="modal" data-bs-target="#adminRejectUnpaidModal">
+                                    <i class="bi bi-x-circle me-1"></i> Chưa Nhận Tiền (Hủy Đơn)
+                                </button>
+                            </div>
+                            {% elif order.payment_status == 'unpaid' %}
+                            <div class="d-flex gap-2">
+                                <form action="{{ url_for('admin.confirm_order_payment', order_id=order.id) }}" method="POST" class="flex-grow-1">
+                                    <button type="submit" class="btn btn-sm btn-outline-success fw-bold w-100">
+                                        <i class="bi bi-check-circle-fill me-1"></i> Xác Nhận Đã Nhận Tiền
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger fw-bold" data-bs-toggle="modal" data-bs-target="#adminRejectUnpaidModal">
+                                    <i class="bi bi-x-circle me-1"></i> Hủy Đơn Hàng
+                                </button>
+                            </div>
+                            {% elif order.payment_status == 'paid' %}
+                            <div class="text-success small fw-bold">
+                                <i class="bi bi-check2-all me-1"></i>Đã nhận đủ tiền chuyển khoản
+                            </div>
+                            {% endif %}
+                        {% else %}
+                        <div class="text-danger small fw-semibold">
+                            <i class="bi bi-slash-circle me-1"></i>Đơn hàng này đã bị hủy.
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
                     <p class="text-muted small">
                         * Ghi chú: Khi chuyển sang trạng thái <strong>"Đã hủy"</strong>, hệ thống sẽ tự động hoàn lại số lượng tồn kho cho các sản phẩm trong đơn.
                     </p>
@@ -122,6 +189,41 @@
                 </tr>
             </tfoot>
         </table>
+    </div>
+</div>
+
+<!-- Modal Admin Hủy Đơn Chưa Nhận Tiền -->
+<div class="modal fade" id="adminRejectUnpaidModal" tabindex="-1" aria-labelledby="adminRejectUnpaidModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger" id="adminRejectUnpaidModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Hủy Đơn Hàng #{{ order.id }} Chưa Thanh Toán
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('admin.cancel_unpaid_order', order_id=order.id) }}" method="POST">
+                <div class="modal-body text-start py-3">
+                    <p class="text-dark mb-2">
+                        Khách hàng bấm xác nhận đã chuyển khoản nhưng tài khoản cửa hàng <strong>chưa nhận được tiền</strong>?
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted">Lý do hủy đơn:</label>
+                        <input type="text" name="reason" class="form-control" value="Khách bấm đã chuyển khoản nhưng tài khoản chưa nhận được tiền" required>
+                    </div>
+                    <div class="alert alert-light border small text-muted mb-0">
+                        <i class="bi bi-info-circle text-primary me-1"></i>
+                        Hệ thống sẽ chuyển trạng thái đơn sang <strong>Đã hủy</strong> và tự động <strong>hoàn trả toàn bộ số lượng sản phẩm</strong> về lại kho hàng.
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 justify-content-end gap-2 pb-3">
+                    <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-danger px-3 fw-bold shadow-sm">
+                        <i class="bi bi-trash me-1"></i> Xác Nhận Hủy Đơn
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

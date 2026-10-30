@@ -158,7 +158,7 @@ class CartService:
         return True, "Đã làm trống giỏ hàng."
 
     @classmethod
-    def checkout(cls, recipient_name, phone, address, user_id=None, selected_ids=None):
+    def checkout(cls, recipient_name, phone, address, user_id=None, selected_ids=None, payment_method='cod'):
         """
         Thực hiện giao dịch thanh toán đặt hàng:
         - Kiểm tra tính hợp lệ của giỏ hàng (hoặc các sản phẩm được tích chọn)
@@ -185,7 +185,9 @@ class CartService:
                 phone=phone.strip(),
                 address=address.strip(),
                 total_amount=total_price,
-                status='pending'
+                status='pending',
+                payment_method=payment_method,
+                payment_status='unpaid'
             )
             db.session.add(order)
             db.session.flush()  # Để lấy order.id

@@ -137,6 +137,11 @@
                                             <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle text-primary me-2"></i>Thông Tin Bổ Sung</h6>
                                             <p class="mb-1"><strong>Mã đơn hàng:</strong> #{{ order.id }}</p>
                                             <p class="mb-1"><strong>Thời gian đặt:</strong> {{ order.created_at.strftime('%H:%M - %d/%m/%Y') }}</p>
+                                            <p class="mb-1"><strong>Hình thức TT:</strong> {{ order.payment_method_label }}</p>
+                                            <p class="mb-1">
+                                                <strong>Thanh toán:</strong>
+                                                <span class="badge bg-{{ order.payment_status_badge_class }}">{{ order.payment_status_label }}</span>
+                                            </p>
                                             <p class="mb-0"><strong>Tài khoản đặt:</strong> 
                                                 {% if order.customer %}
                                                     <span class="badge bg-info text-dark">{{ order.customer.username }}</span>
@@ -144,6 +149,26 @@
                                                     <span class="badge bg-secondary">Khách vãng lai</span>
                                                 {% endif %}
                                             </p>
+                                            <div class="mt-2 pt-2 border-top d-flex gap-2 flex-wrap align-items-center">
+                                                {% if order.payment_method == 'qr_code' and order.payment_status != 'paid' and order.status != 'cancelled' %}
+                                                <a href="{{ url_for('cart.order_success', order_id=order.id) }}" class="btn btn-sm btn-primary fw-semibold">
+                                                    <i class="bi bi-qr-code me-1"></i>Quét mã QR Chuyển Khoản
+                                                </a>
+                                                {% endif %}
+                                                {% if order.status == 'pending' and order.payment_status == 'unpaid' %}
+                                                <button type="button" class="btn btn-sm btn-outline-danger fw-semibold" data-bs-toggle="modal" data-bs-target="#cancelModal{{ order.id }}">
+                                                    <i class="bi bi-x-circle me-1"></i>Hủy đơn hàng
+                                                </button>
+                                                {% elif order.status == 'pending' and order.payment_status == 'awaiting_confirmation' %}
+                                                <span class="badge bg-warning text-dark py-1 px-2" title="Đã gửi xác nhận chuyển khoản, đang chờ Admin duyệt">
+                                                    <i class="bi bi-hourglass-split me-1"></i>Đang chờ duyệt TT (Không thể hủy)
+                                                </span>
+                                                {% elif order.status == 'cancelled' %}
+                                                <a href="{{ url_for('cart.reorder', order_id=order.id) }}" class="btn btn-sm btn-outline-success fw-semibold">
+                                                    <i class="bi bi-cart-plus me-1"></i>Đặt lại đơn này
+                                                </a>
+                                                {% endif %}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -197,6 +222,41 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Modal Xác Nhận Hủy Đơn Hàng #{{ order.id }} -->
+                        {% if order.status == 'pending' and order.payment_status == 'unpaid' %}
+                        <div class="modal fade" id="cancelModal{{ order.id }}" tabindex="-1" aria-labelledby="cancelModalLabel{{ order.id }}" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content border-0 shadow">
+                                    <div class="modal-header border-bottom-0 pb-0">
+                                        <h5 class="modal-title fw-bold text-danger" id="cancelModalLabel{{ order.id }}">
+                                            <i class="bi bi-exclamation-triangle-fill me-2"></i>Xác Nhận Hủy Đơn Hàng #{{ order.id }}
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body text-center py-4">
+                                        <div class="mb-3">
+                                            <i class="bi bi-x-circle-fill text-danger" style="font-size: 3.5rem;"></i>
+                                        </div>
+                                        <h6 class="fw-bold text-dark mb-2">Bạn có chắc chắn muốn hủy đơn hàng này?</h6>
+                                        <p class="text-muted small mb-0">
+                                            Sau khi hủy, đơn hàng sẽ không được xử lý và giao nữa. Toàn bộ sản phẩm sẽ được tự động hoàn lại kho hàng.
+                                        </p>
+                                    </div>
+                                    <div class="modal-footer border-top-0 pt-0 justify-content-center gap-2 pb-4">
+                                        <button type="button" class="btn btn-light border px-4 fw-semibold" data-bs-dismiss="modal">
+                                            Quay Lại
+                                        </button>
+                                        <form action="{{ url_for('cart.cancel_order', order_id=order.id) }}" method="POST">
+                                            <button type="submit" class="btn btn-danger px-4 fw-bold shadow-sm">
+                                                <i class="bi bi-trash me-1"></i> Xác Nhận Hủy
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>

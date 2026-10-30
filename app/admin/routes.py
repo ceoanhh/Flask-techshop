@@ -293,6 +293,8 @@ def update_order_status(order_id):
             for item in order.items.all():
                 if item.product:
                     item.product.stock_quantity += item.quantity
+            if order.payment_status == 'awaiting_confirmation':
+                order.payment_status = 'unpaid'
 
         # Nếu mở lại đơn từ cancelled: kiểm tra và trừ tồn kho
         elif old_status == 'cancelled' and new_status in ['pending', 'completed']:
@@ -317,6 +319,45 @@ def update_order_status(order_id):
         flash(f'Lỗi khi cập nhật trạng thái đơn: {str(e)}', 'danger')
 
     return redirect(request.referrer or url_for('admin.manage_orders'))
+
+
+@bp.route('/orders/<int:order_id>/confirm-payment', methods=['POST'])
+def confirm_order_payment(order_id):
+    """Admin xác nhận thủ công đã nhận tiền chuyển khoản của đơn hàng."""
+    order = Order.query.get_or_404(order_id)
+    order.payment_status = 'paid'
+    db.session.commit()
+    flash(f'Đã xác nhận đã nhận tiền chuyển khoản cho đơn hàng #{order.id}!', 'success')
+    return redirect(request.referrer or url_for('admin.order_detail', order_id=order.id))
+
+
+@bp.route('/orders/<int:order_id>/cancel-unpaid', methods=['POST'])
+def cancel_unpaid_order(order_id):
+    """
+    Admin hủy đơn hàng khi khách bấm 'đã thanh toán' nhưng thực tế chưa nhận được tiền chuyển khoản.
+    Tự động hoàn lại số lượng tồn kho cho các sản phẩm, đặt status = 'cancelled' và payment_status = 'unpaid'.
+    """
+    order = Order.query.get_or_404(order_id)
+    reason = request.form.get('reason', '').strip()
+    if not reason:
+        reason = "Chưa nhận được tiền chuyển khoản từ khách hàng"
+
+    try:
+        # Nếu đơn chưa bị hủy, hoàn trả lại tồn kho
+        if order.status != 'cancelled':
+            for item in order.items.all():
+                if item.product:
+                    item.product.stock_quantity += item.quantity
+
+        order.status = 'cancelled'
+        order.payment_status = 'unpaid'
+        db.session.commit()
+        flash(f'Đã hủy đơn hàng #{order.id} (Lý do: {reason}). Sản phẩm đã được hoàn trả lại kho!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi khi hủy đơn hàng: {str(e)}', 'danger')
+
+    return redirect(request.referrer or url_for('admin.order_detail', order_id=order.id))
 
 
 # ----------------------------------------------------

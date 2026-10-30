@@ -601,5 +601,149 @@ class TestCartAndAdminTasks(unittest.TestCase):
         self.assertEqual(res_try_old.status_code, 400)
         self.assertIn('đã bị hủy', res_try_old.get_json()['message'])
 
+    def test_qr_payment_and_manual_confirmation(self):
+        """Kiểm tra luồng thanh toán QR VietQR và xác nhận thủ công (khách báo CK & admin duyệt)."""
+        # 1. Thêm sản phẩm vào giỏ
+        self.client.post(f'/cart/add/{self.product.id}', data={'quantity': 1})
+
+        # 2. Đăng nhập customer
+        self.client.post('/auth/login', data={'login_id': 'user@test.vn', 'password': 'user123'})
+
+        # 3. Đặt hàng chọn payment_method = 'qr_code'
+        res_checkout = self.client.post('/cart/checkout', data={
+            'recipient_name': 'Khách Test QR',
+            'phone': '0912345678',
+            'address': 'Hà Nội',
+            'payment_method': 'qr_code'
+        }, follow_redirects=True)
+        self.assertEqual(res_checkout.status_code, 200)
+
+        # Kiểm tra Order trong DB
+        order = Order.query.filter_by(phone='0912345678').order_by(Order.id.desc()).first()
+        self.assertIsNotNone(order)
+        self.assertEqual(order.payment_method, 'qr_code')
+        self.assertEqual(order.payment_status, 'unpaid')
+        self.assertIn('vietqr.io', order.qr_code_url)
+        self.assertGreater(order.qr_expiry_seconds, 850)
+        self.assertFalse(order.is_qr_expired)
+
+        # Kiểm tra trang order_success có thông tin VietQR
+        html = res_checkout.data.decode('utf-8')
+        self.assertIn('MBBank', html)
+        self.assertIn('0366760056', html)
+        self.assertIn(f'TECHSHOP {order.id}', html)
+
+        # 4. Khách hàng bấm "Tôi đã chuyển khoản thành công"
+        res_confirm = self.client.post(f'/cart/order/{order.id}/confirm-payment', follow_redirects=True)
+        self.assertEqual(res_confirm.status_code, 200)
+        reloaded_order = db.session.get(Order, order.id)
+        self.assertEqual(reloaded_order.payment_status, 'awaiting_confirmation')
+
+        # 5. Admin đăng nhập và duyệt thanh toán
+        self.client.get('/auth/logout')
+        self.client.post('/auth/login', data={'login_id': 'admin@test.vn', 'password': 'admin123'})
+
+        res_admin_confirm = self.client.post(f'/admin/orders/{order.id}/confirm-payment', follow_redirects=True)
+        self.assertEqual(res_admin_confirm.status_code, 200)
+        reloaded_order2 = db.session.get(Order, order.id)
+        self.assertEqual(reloaded_order2.payment_status, 'paid')
+
+    def test_cancel_unpaid_order_and_reorder(self):
+        """Kiểm tra người mua hủy đơn hàng khi chưa thanh toán và đặt lại đơn."""
+        # 1. Ban đầu tồn kho là 10. Mua 3 cái -> tồn kho còn 7
+        self.client.post(f'/cart/add/{self.product.id}', data={'quantity': 3})
+        self.client.post('/auth/login', data={'login_id': 'user@test.vn', 'password': 'user123'})
+        res_checkout = self.client.post('/cart/checkout', data={
+            'recipient_name': 'Khách Hủy Đơn',
+            'phone': '0912345678',
+            'address': 'Hà Nội',
+            'payment_method': 'qr_code'
+        }, follow_redirects=True)
+        self.assertEqual(res_checkout.status_code, 200)
+
+        p = db.session.get(Product, self.product.id)
+        self.assertEqual(p.stock_quantity, 7)
+
+        order = Order.query.filter_by(recipient_name='Khách Hủy Đơn').first()
+        self.assertIsNotNone(order)
+        self.assertEqual(order.status, 'pending')
+
+        # 2. Khách hàng thực hiện hủy đơn hàng
+        res_cancel = self.client.post(f'/cart/order/{order.id}/cancel', follow_redirects=True)
+        self.assertEqual(res_cancel.status_code, 200)
+        self.assertIn('Đơn Hàng Đã Bị Hủy'.encode('utf-8'), res_cancel.data)
+
+        # Kiểm tra trạng thái đơn đã chuyển sang cancelled
+        reloaded_order = db.session.get(Order, order.id)
+        self.assertEqual(reloaded_order.status, 'cancelled')
+
+        # Kiểm tra tồn kho đã được hoàn lại: 7 + 3 = 10
+        p_reloaded = db.session.get(Product, self.product.id)
+        self.assertEqual(p_reloaded.stock_quantity, 10)
+
+        # 3. Khách bấm đặt lại đơn hàng này (reorder)
+        res_reorder = self.client.get(f'/cart/order/{order.id}/reorder', follow_redirects=True)
+        self.assertEqual(res_reorder.status_code, 200)
+
+        # Giỏ hàng phải có lại 3 sản phẩm
+        with self.client.session_transaction() as sess:
+            cart = sess.get('cart', {})
+            self.assertEqual(cart.get(str(self.product.id)), 3)
+
+    def test_cannot_cancel_after_clicking_paid_and_admin_cancel_unpaid(self):
+        """Kiểm tra: khách bấm đã chuyển khoản thì không thể tự hủy đơn, admin có quyền hủy đơn khi chưa nhận được tiền."""
+        # 1. Khách mua 2 sản phẩm (tồn kho 10 -> còn 8)
+        self.client.post(f'/cart/add/{self.product.id}', data={'quantity': 2})
+        self.client.post('/auth/login', data={'login_id': 'user@test.vn', 'password': 'user123'})
+        res_checkout = self.client.post('/cart/checkout', data={
+            'recipient_name': 'Khách Xác Nhận Giả',
+            'phone': '0912345678',
+            'address': 'TP.HCM',
+            'payment_method': 'qr_code'
+        }, follow_redirects=True)
+        self.assertEqual(res_checkout.status_code, 200)
+
+        order = Order.query.filter_by(recipient_name='Khách Xác Nhận Giả').first()
+        self.assertIsNotNone(order)
+        self.assertEqual(order.payment_status, 'unpaid')
+
+        # 2. Khách bấm "Tôi đã chuyển khoản thành công"
+        res_confirm = self.client.post(f'/cart/order/{order.id}/confirm-payment', follow_redirects=True)
+        self.assertEqual(res_confirm.status_code, 200)
+
+        reloaded_order = db.session.get(Order, order.id)
+        self.assertEqual(reloaded_order.payment_status, 'awaiting_confirmation')
+
+        # 3. Khách cố tình bấm hủy đơn hàng -> Bị chặn, không thể tự hủy
+        res_cancel = self.client.post(f'/cart/order/{order.id}/cancel', follow_redirects=True)
+        self.assertEqual(res_cancel.status_code, 200)
+        self.assertIn('không thể tự hủy'.encode('utf-8'), res_cancel.data)
+
+        # Trạng thái đơn vẫn là pending, tồn kho vẫn là 8
+        reloaded_order = db.session.get(Order, order.id)
+        self.assertEqual(reloaded_order.status, 'pending')
+        p = db.session.get(Product, self.product.id)
+        self.assertEqual(p.stock_quantity, 8)
+
+        # 4. Admin đăng nhập và kiểm tra thấy chưa nhận được tiền -> Admin bấm Hủy đơn
+        self.client.get('/auth/logout')
+        self.client.post('/auth/login', data={'login_id': 'admin@test.vn', 'password': 'admin123'})
+
+        res_admin_cancel = self.client.post(
+            f'/admin/orders/{order.id}/cancel-unpaid',
+            data={'reason': 'Kiểm tra tài khoản không có giao dịch'},
+            follow_redirects=True
+        )
+        self.assertEqual(res_admin_cancel.status_code, 200)
+        self.assertIn('Đã hủy đơn hàng'.encode('utf-8'), res_admin_cancel.data)
+
+        # 5. Kiểm tra đơn hàng đã bị hủy, payment_status là unpaid, và tồn kho được hoàn lại 8 + 2 = 10
+        order_final = db.session.get(Order, order.id)
+        self.assertEqual(order_final.status, 'cancelled')
+        self.assertEqual(order_final.payment_status, 'unpaid')
+
+        p_final = db.session.get(Product, self.product.id)
+        self.assertEqual(p_final.stock_quantity, 10)
+
 if __name__ == '__main__':
     unittest.main()

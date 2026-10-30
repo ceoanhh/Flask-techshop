@@ -68,6 +68,8 @@ class Order(db.Model):
     address = db.Column(db.String(256), nullable=False)
     total_amount = db.Column(db.Float, nullable=False, default=0.0)
     status = db.Column(db.String(20), default='pending')  # 'pending', 'completed', 'cancelled'
+    payment_method = db.Column(db.String(30), default='cod')  # 'cod', 'qr_code'
+    payment_status = db.Column(db.String(30), default='unpaid')  # 'unpaid', 'awaiting_confirmation', 'paid'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     items = db.relationship('OrderItem', backref='order', lazy='dynamic', cascade='all, delete-orphan')
@@ -89,6 +91,54 @@ class Order(db.Model):
             'cancelled': 'danger'
         }
         return classes.get(self.status, 'secondary')
+
+    @property
+    def payment_method_label(self):
+        if self.payment_method == 'qr_code':
+            return 'Chuyển khoản QR'
+        return 'Thanh toán khi nhận hàng (COD)'
+
+    @property
+    def payment_status_label(self):
+        labels = {
+            'unpaid': 'Chưa thanh toán',
+            'awaiting_confirmation': 'Chờ xác nhận CK',
+            'paid': 'Đã thanh toán'
+        }
+        return labels.get(self.payment_status, self.payment_status)
+
+    @property
+    def payment_status_badge_class(self):
+        classes = {
+            'unpaid': 'secondary',
+            'awaiting_confirmation': 'warning text-dark',
+            'paid': 'success'
+        }
+        return classes.get(self.payment_status, 'secondary')
+
+    @property
+    def qr_code_url(self):
+        """Tạo đường dẫn mã VietQR tự động qua Napas / VietQR API."""
+        bank_id = "MB"
+        account_no = "0366760056"
+        account_name = "TECHSHOP STORE"
+        amount = int(self.total_amount)
+        memo = f"TECHSHOP {self.id}"
+        from urllib.parse import quote
+        return f"https://img.vietqr.io/image/{bank_id}-{account_no}-compact2.jpg?amount={amount}&addInfo={quote(memo)}&accountName={quote(account_name)}"
+
+    @property
+    def qr_expiry_seconds(self):
+        """Tính số giây còn lại của hiệu lực 15 phút (900 giây) kể từ khi tạo đơn."""
+        if not self.created_at:
+            return 0
+        diff = (datetime.utcnow() - self.created_at).total_seconds()
+        remaining = 900 - int(diff)
+        return max(0, remaining)
+
+    @property
+    def is_qr_expired(self):
+        return self.qr_expiry_seconds <= 0
 
     def __repr__(self):
         return f'<Order #{self.id} - {self.status}>'

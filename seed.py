@@ -12,15 +12,15 @@ def seed_data():
         db.create_all()
 
         print("=> 1. Đang tạo tài khoản người dùng...")
-        admin = User(username='admin', email='admin@techshop.vn', role='admin')
+        admin = User(username='admin', email='admin@techshop.vn', phone='0988888888', role='admin')
         admin.set_password('admin123')
         db.session.add(admin)
 
-        user1 = User(username='khachhang', email='user@techshop.vn', role='customer')
+        user1 = User(username='khachhang', email='user@techshop.vn', phone='0912345678', role='customer')
         user1.set_password('user123')
         db.session.add(user1)
 
-        user2 = User(username='hoangnam', email='nam.hoang@gmail.com', role='customer')
+        user2 = User(username='hoangnam', email='nam.hoang@gmail.com', phone='0977112233', role='customer')
         user2.set_password('user123')
         db.session.add(user2)
 

@@ -62,7 +62,24 @@
             <tbody>
                 {% for o in orders %}
                 <tr>
-                    <td class="fw-bold text-primary">#{{ o.id }}</td>
+                    <td class="fw-bold text-primary">
+                        #{{ o.id }}
+                        <div>
+                            {% if o.payment_method == 'qr_code' %}
+                                {% if o.payment_status == 'awaiting_confirmation' and o.status != 'cancelled' %}
+                                <span class="badge bg-warning text-dark border border-warning shadow-sm" style="font-size: 0.68rem;" title="Khách báo đã chuyển khoản - Chờ Admin đối soát">
+                                    <i class="bi bi-bell-fill text-danger me-1"></i>Chờ duyệt TT
+                                </span>
+                                {% else %}
+                                <span class="badge bg-{{ o.payment_status_badge_class }}" style="font-size: 0.65rem;" title="Chuyển khoản QR: {{ o.payment_status_label }}">
+                                    <i class="bi bi-qr-code"></i> {{ o.payment_status_label }}
+                                </span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-light text-dark border" style="font-size: 0.65rem;">COD</span>
+                            {% endif %}
+                        </div>
+                    </td>
                     <td>
                         <strong class="text-dark">{{ o.recipient_name }}</strong>
                         <div class="small text-muted text-truncate" style="max-width: 200px;" title="{{ o.address }}">

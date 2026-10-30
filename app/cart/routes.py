@@ -233,12 +233,17 @@ def checkout():
             )
 
         user_id = current_user.id if current_user.is_authenticated else None
+        payment_method = request.form.get('payment_method', 'cod')
+        if payment_method not in ['cod', 'qr_code']:
+            payment_method = 'cod'
+
         order, error = CartService.checkout(
             recipient_name=recipient_name,
             phone=phone,
             address=address,
             user_id=user_id,
-            selected_ids=selected_ids
+            selected_ids=selected_ids,
+            payment_method=payment_method
         )
 
         if error:
@@ -273,6 +278,97 @@ def order_success(order_id):
     """Trang thông báo đặt hàng thành công và chi tiết đơn hàng."""
     order = Order.query.get_or_404(order_id)
     return render_template('order_success.html', order=order)
+
+@bp.route('/order/<int:order_id>/confirm-payment', methods=['POST'])
+def confirm_order_payment(order_id):
+    """Khách hàng bấm xác nhận đã chuyển khoản thành công qua mã QR."""
+    order = Order.query.get_or_404(order_id)
+    
+    if order.payment_status == 'paid':
+        flash('Đơn hàng này đã được xác nhận thanh toán thành công!', 'info')
+    else:
+        order.payment_status = 'awaiting_confirmation'
+        db.session.commit()
+        flash(f'Đã gửi thông báo xác nhận chuyển khoản cho đơn #{order.id}! Quản trị viên TechShop sẽ đối soát và xử lý trong ít phút.', 'success')
+
+    if _is_ajax():
+        return jsonify({
+            'success': True,
+            'payment_status': order.payment_status,
+            'payment_status_label': order.payment_status_label,
+            'message': f'Đã gửi thông báo xác nhận chuyển khoản cho đơn #{order.id}!'
+        })
+
+    return redirect(request.referrer or url_for('cart.order_success', order_id=order.id))
+
+@bp.route('/order/<int:order_id>/cancel', methods=['POST'])
+def cancel_order(order_id):
+    """Khách hàng hủy đơn hàng khi chưa thanh toán / đang chờ xử lý."""
+    order = Order.query.get_or_404(order_id)
+
+    if order.status == 'cancelled':
+        flash(f'Đơn hàng #{order.id} đã ở trạng thái đã hủy trước đó.', 'info')
+        return redirect(request.referrer or url_for('cart.order_success', order_id=order.id))
+
+    if order.status == 'completed':
+        flash('Không thể hủy đơn hàng đã hoàn thành!', 'danger')
+        return redirect(request.referrer or url_for('cart.order_success', order_id=order.id))
+
+    if order.payment_status == 'paid':
+        flash('Đơn hàng đã được thanh toán thành công. Vui lòng liên hệ hotline TechShop để được hỗ trợ hủy đơn và hoàn tiền!', 'warning')
+        return redirect(request.referrer or url_for('cart.order_success', order_id=order.id))
+
+    if order.payment_status == 'awaiting_confirmation':
+        flash('Đơn hàng đã được gửi xác nhận chuyển khoản và đang chờ Admin kiểm tra tài khoản. Bạn không thể tự hủy đơn lúc này! Vui lòng liên hệ TechShop nếu cần hỗ trợ.', 'warning')
+        if _is_ajax():
+            return jsonify({
+                'success': False,
+                'message': 'Đơn hàng đang chờ Admin đối soát thanh toán, bạn không thể tự hủy đơn.'
+            }), 400
+        return redirect(request.referrer or url_for('cart.order_success', order_id=order.id))
+
+    try:
+        # Cập nhật trạng thái đã hủy
+        order.status = 'cancelled'
+
+        # Hoàn trả lại số lượng tồn kho sản phẩm
+        for item in order.items.all():
+            if item.product:
+                item.product.stock_quantity += item.quantity
+
+        db.session.commit()
+        flash(f'Đã hủy đơn hàng #{order.id} thành công! Toàn bộ sản phẩm đã được hoàn trả lại kho.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi khi hủy đơn hàng: {str(e)}', 'danger')
+
+    if _is_ajax():
+        return jsonify({
+            'success': True,
+            'message': f'Đã hủy đơn hàng #{order.id} thành công!',
+            'status': order.status,
+            'status_label': order.status_label
+        })
+
+    return redirect(request.referrer or url_for('cart.order_success', order_id=order.id))
+
+@bp.route('/order/<int:order_id>/reorder', methods=['GET', 'POST'])
+def reorder(order_id):
+    """Đặt lại đơn hàng: nạp lại các sản phẩm của đơn hàng cũ vào giỏ hàng."""
+    order = Order.query.get_or_404(order_id)
+    added_count = 0
+    for item in order.items.all():
+        if item.product and item.product.stock_quantity > 0:
+            qty = min(item.quantity, item.product.stock_quantity)
+            CartService.add_to_cart(item.product_id, qty)
+            added_count += 1
+
+    if added_count > 0:
+        flash(f'Đã nạp lại các sản phẩm từ đơn #{order.id} vào giỏ hàng của bạn.', 'success')
+    else:
+        flash('Các sản phẩm trong đơn hàng này hiện đã hết hàng trong kho!', 'warning')
+
+    return redirect(url_for('cart.view_cart'))
 
 @bp.route('/tracking')
 def order_tracking():

@@ -42,13 +42,20 @@
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label fw-bold">Phương thức thanh toán</label>
-                        <div class="form-check p-3 border rounded bg-light">
+                        <label class="form-label fw-bold">Phương thức thanh toán <span class="text-danger">*</span></label>
+                        <div class="form-check p-3 border rounded bg-light mb-2">
                             <input class="form-check-input" type="radio" name="payment_method" id="cod" value="cod" checked>
-                            <label class="form-check-label fw-semibold" for="cod">
+                            <label class="form-check-label fw-semibold cursor-pointer" for="cod">
                                 <i class="bi bi-cash-stack text-success me-1"></i> Thanh toán khi nhận hàng (COD)
                             </label>
-                            <small class="d-block text-muted ps-4">Bạn chỉ thanh toán khi đã nhận và kiểm tra hàng.</small>
+                            <small class="d-block text-muted ps-4">Bạn chỉ thanh toán tiền mặt khi đã nhận và kiểm tra hàng.</small>
+                        </div>
+                        <div class="form-check p-3 border rounded bg-light">
+                            <input class="form-check-input" type="radio" name="payment_method" id="qr_code" value="qr_code">
+                            <label class="form-check-label fw-semibold cursor-pointer" for="qr_code">
+                                <i class="bi bi-qr-code text-primary me-1"></i> Chuyển khoản ngân hàng qua mã QR (VietQR)
+                            </label>
+                            <small class="d-block text-muted ps-4">Quét mã QR qua app ngân hàng bất kỳ, mã tự điền số tiền và có hiệu lực 15 phút.</small>
                         </div>
                     </div>
 

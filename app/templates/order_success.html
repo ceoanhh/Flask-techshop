@@ -1,16 +1,26 @@
 {% extends 'base.html' %}
 
-{% block title %}Đặt Hàng Thành Công - TechShop{% endblock %}
+{% block title %}{% if order.status == 'cancelled' %}Đơn Hàng Đã Bị Hủy{% else %}Đặt Hàng Thành Công{% endif %} - TechShop{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card shadow-sm border-0 text-center p-4 mb-4">
+            {% if order.status == 'cancelled' %}
+            <div class="mb-3">
+                <i class="bi bi-x-circle-fill text-danger" style="font-size: 4rem;"></i>
+            </div>
+            <h2 class="fw-bold text-danger mb-2">Đơn Hàng Đã Bị Hủy</h2>
+            <p class="text-muted mb-4">
+                Đơn hàng <strong>#{{ order.id }}</strong> đã được hủy thành công. Toàn bộ sản phẩm đã được hoàn trả lại kho và không phát sinh bất kỳ khoản thanh toán nào.
+            </p>
+            {% else %}
             <div class="mb-3">
                 <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
             </div>
             <h2 class="fw-bold text-success mb-2">Đặt Hàng Thành Công!</h2>
             <p class="text-muted mb-4">Cảm ơn bạn đã tin tưởng mua sắm tại TechShop. Đơn hàng của bạn đang được tiếp nhận và xử lý.</p>
+            {% endif %}
             
             <div class="alert alert-light border text-start p-3 mb-4">
                 <div class="row g-2">
@@ -38,8 +48,137 @@
                         <span class="text-muted">Trạng thái:</span>
                         <span class="badge bg-{{ order.status_badge_class }} ms-1">{{ order.status_label }}</span>
                     </div>
+                    <div class="col-sm-6">
+                        <span class="text-muted">Hình thức TT:</span>
+                        <strong class="ms-1">{{ order.payment_method_label }}</strong>
+                    </div>
+                    <div class="col-sm-6">
+                        <span class="text-muted">Thanh toán:</span>
+                        <span id="payment-status-badge" class="badge bg-{{ order.payment_status_badge_class }} ms-1">{{ order.payment_status_label }}</span>
+                    </div>
                 </div>
             </div>
+
+            {% if order.payment_method == 'qr_code' %}
+                {% if order.status == 'cancelled' %}
+                <!-- Thông báo khi đơn hàng QR đã bị hủy -->
+                <div class="alert alert-secondary text-start p-3 mb-4 rounded-3 d-flex align-items-center shadow-sm">
+                    <i class="bi bi-slash-circle-fill fs-3 text-danger me-3"></i>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-1">Mã QR Thanh Toán Đã Bị Vô Hiệu Hóa</h6>
+                        <p class="text-muted small mb-0">Đơn hàng này đã bị hủy, vui lòng không chuyển tiền vào mã QR này nữa.</p>
+                    </div>
+                </div>
+                {% else %}
+                <!-- Khối Thanh Toán VietQR Chuyển Khoản Ngân Hàng (Hiệu lực 15 phút) -->
+                <div class="card border-primary border-2 shadow-sm rounded-4 mb-4 text-start overflow-hidden">
+                    <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="fw-bold fs-6">
+                            <i class="bi bi-qr-code-scan me-2"></i>Thanh Toán Chuyển Khoản Qua Mã VietQR
+                        </div>
+                        <div class="badge bg-white text-primary px-3 py-2 fw-bold fs-6 shadow-sm" id="qr-countdown-box">
+                            <i class="bi bi-clock-history me-1 text-danger"></i>Hết hạn sau: <span id="qr-timer" class="text-danger fw-bolder">15:00</span>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row align-items-center g-4">
+                            <div class="col-md-5 text-center">
+                                <div class="p-2 border rounded-3 bg-white d-inline-block shadow-sm position-relative">
+                                    <img src="{{ order.qr_code_url }}" 
+                                         id="vietqr-img" 
+                                         alt="Mã QR Chuyển Khoản" 
+                                         class="img-fluid rounded" 
+                                         style="max-width: 250px;">
+                                    <div id="qr-expired-overlay" class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 rounded d-none d-flex flex-column align-items-center justify-content-center text-white p-3 text-center">
+                                        <i class="bi bi-exclamation-octagon-fill fs-1 text-danger mb-2"></i>
+                                        <strong class="text-white">Mã QR đã hết hạn</strong>
+                                        <small class="text-white-50">Vui lòng liên hệ hotline hoặc tạo lại đơn hàng mới.</small>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mt-2">
+                                    <i class="bi bi-shield-check text-success me-1"></i>Quét mã tự động điền đúng số tiền & nội dung
+                                </div>
+                            </div>
+                            <div class="col-md-7">
+                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-bank me-2 text-primary"></i>Thông Tin Chuyển Khoản Thủ Công:</h6>
+                                <ul class="list-group list-group-flush border rounded-3 mb-3">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                        <span class="text-muted small">Ngân hàng:</span>
+                                        <strong class="text-dark">MBBank (Ngân hàng Quân Đội)</strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                        <span class="text-muted small">Chủ tài khoản:</span>
+                                        <strong class="text-dark">TECHSHOP STORE</strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                        <span class="text-muted small">Số tài khoản:</span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="fw-bold text-primary font-monospace fs-6">0366760056</span>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-copy" data-copy="0366760056" title="Sao chép STK">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                        <span class="text-muted small">Số tiền:</span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="fw-bold text-danger fs-6">{{ "{:,.0f}".format(order.total_amount) }} VNĐ</span>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-copy" data-copy="{{ '{:.0f}'.format(order.total_amount) }}" title="Sao chép số tiền">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-2 bg-light">
+                                        <span class="text-muted small">Nội dung CK:</span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="fw-bold text-primary font-monospace fs-6">TECHSHOP {{ order.id }}</span>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-copy" data-copy="TECHSHOP {{ order.id }}" title="Sao chép nội dung">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
+                                    </li>
+                                </ul>
+
+                                <!-- Nút Xác Nhận Đã Chuyển Khoản Thủ Công & Hủy Đơn -->
+                                <div id="payment-action-box">
+                                    {% if order.payment_status == 'paid' %}
+                                        <div class="alert alert-success d-flex align-items-center mb-0 py-2">
+                                            <i class="bi bi-check-circle-fill fs-4 me-2"></i>
+                                            <div>
+                                                <strong>Đã thanh toán thành công!</strong> Đơn hàng đã được nhân viên TechShop duyệt.
+                                            </div>
+                                        </div>
+                                    {% elif order.payment_status == 'awaiting_confirmation' %}
+                                        <div class="alert alert-warning d-flex align-items-center mb-2 py-2">
+                                            <i class="bi bi-hourglass-split fs-4 me-2"></i>
+                                            <div>
+                                                <strong>Đã gửi xác nhận chuyển khoản!</strong> Đang chờ nhân viên đối soát tiền về tài khoản.
+                                            </div>
+                                        </div>
+                                        <div class="alert alert-light border small text-muted py-2 px-3 mb-0">
+                                            <i class="bi bi-info-circle text-primary me-1"></i>
+                                            Bạn đã bấm xác nhận chuyển khoản, đơn hàng đang được kiểm tra nên <strong>không thể tự hủy</strong>. Vui lòng liên hệ Admin nếu cần hỗ trợ thêm.
+                                        </div>
+                                    {% else %}
+                                        <form id="formConfirmPayment" action="{{ url_for('cart.confirm_order_payment', order_id=order.id) }}" method="POST" class="d-flex flex-wrap gap-2">
+                                            <button type="submit" id="btnConfirmPayment" class="btn btn-success btn-lg flex-grow-1 fw-bold shadow-sm py-2">
+                                                <i class="bi bi-check2-circle me-1"></i> Tôi Đã Chuyển Khoản Thành Công
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger btn-lg fw-semibold px-3 py-2" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+                                                <i class="bi bi-x-circle me-1"></i> Hủy Đơn
+                                            </button>
+                                        </form>
+                                        <small class="text-muted d-block mt-2 text-center">
+                                            Sau khi hoàn tất chuyển khoản trên app ngân hàng, vui lòng bấm nút trên để thông báo cho hệ thống.
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            {% endif %}
 
             <h5 class="fw-bold text-start mb-3"><i class="bi bi-box-seam text-primary me-2"></i>Chi Tiết Mặt Hàng</h5>
             <div class="table-responsive mb-4 text-start">
@@ -113,6 +252,15 @@
             {% endif %}
 
             <div class="d-flex justify-content-center flex-wrap gap-3">
+                {% if order.status == 'cancelled' %}
+                    <a href="{{ url_for('cart.reorder', order_id=order.id) }}" class="btn btn-success btn-lg fw-semibold shadow-sm">
+                        <i class="bi bi-cart-plus me-1"></i> Đặt Lại Đơn Hàng Này (Mua lại)
+                    </a>
+                {% elif order.status == 'pending' and order.payment_status == 'unpaid' and order.payment_method == 'cod' %}
+                    <button type="button" class="btn btn-outline-danger btn-lg fw-semibold" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+                        <i class="bi bi-x-circle me-1"></i> Hủy Đơn Hàng Này
+                    </button>
+                {% endif %}
                 <a href="{{ url_for('cart.order_tracking', q=order.id) }}" class="btn btn-outline-primary btn-lg fw-semibold">
                     <i class="bi bi-truck me-1"></i> Theo Dõi Trạng Thái Đơn Hàng
                 </a>
@@ -123,4 +271,101 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Xác Nhận Hủy Đơn Hàng -->
+{% if order.status == 'pending' and order.payment_status == 'unpaid' %}
+<div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-labelledby="cancelOrderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger" id="cancelOrderModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Xác Nhận Hủy Đơn Hàng
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3">
+                    <i class="bi bi-x-circle-fill text-danger" style="font-size: 3.5rem;"></i>
+                </div>
+                <h6 class="fw-bold text-dark mb-2">Bạn có chắc chắn muốn hủy đơn hàng #{{ order.id }}?</h6>
+                <p class="text-muted small mb-0">
+                    Sau khi hủy, đơn hàng sẽ không được xử lý và giao nữa, toàn bộ sản phẩm sẽ được hoàn trả lại kho.
+                </p>
+            </div>
+            <div class="modal-footer border-top-0 pt-0 justify-content-center gap-2 pb-4">
+                <button type="button" class="btn btn-light border px-4 fw-semibold" data-bs-dismiss="modal">
+                    Quay Lại
+                </button>
+                <form action="{{ url_for('cart.cancel_order', order_id=order.id) }}" method="POST">
+                    <button type="submit" class="btn btn-danger px-4 fw-bold shadow-sm">
+                        <i class="bi bi-trash me-1"></i> Xác Nhận Hủy Đơn
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if order.payment_method == 'qr_code' %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 1. Sao chép nội dung khi bấm nút copy
+    document.querySelectorAll('.btn-copy').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const text = this.dataset.copy;
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(function () {
+                if (window.showToast) {
+                    window.showToast(`Đã sao chép: "${text}"`, 'info');
+                }
+            }).catch(function () {
+                const el = document.createElement('textarea');
+                el.value = text;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                if (window.showToast) window.showToast(`Đã sao chép: "${text}"`, 'info');
+            });
+        });
+    });
+
+    // 2. Đồng hồ đếm ngược 15 phút (900s)
+    let remaining = {{ order.qr_expiry_seconds }};
+    const timerEl = document.getElementById('qr-timer');
+    const overlayEl = document.getElementById('qr-expired-overlay');
+    const confirmBtn = document.getElementById('btnConfirmPayment');
+
+    function updateTimerDisplay() {
+        if (remaining <= 0) {
+            if (timerEl) timerEl.textContent = '00:00';
+            if (overlayEl) overlayEl.classList.remove('d-none');
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.classList.replace('btn-success', 'btn-secondary');
+                confirmBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i> Mã QR Đã Hết Hiệu Lực (15 Phút)';
+            }
+            return;
+        }
+
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        if (timerEl) timerEl.textContent = formatted;
+        remaining--;
+    }
+
+    updateTimerDisplay();
+    if (remaining > 0) {
+        const interval = setInterval(function () {
+            if (remaining <= 0) {
+                clearInterval(interval);
+            }
+            updateTimerDisplay();
+        }, 1000);
+    }
+});
+</script>
+{% endif %}
 {% endblock %}
